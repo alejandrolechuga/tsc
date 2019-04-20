@@ -1,16 +1,19 @@
-use node::Node;
-
 grammar;
 
-pub InputElementDiv: Node = {
-  Comment,
+pub InputElementDiv: String = {
   Whitespace,
+  LineTerminator,
+  Comment,
 };
 
-Comment: Node = {
-  r"//" => Node::Comment("comment")
+Whitespace: String = {
+  r"\x09|\x0B|\x0C|\xFEFF|\p{Space_Separator}" => <>.to_string()
 };
 
-Whitespace: Node = {
-  r"\x09|\x0b|\x0C|\x20|\xA0|\xFEFF|\p{Space_Separator}" => Node::Whitespace(<>.to_string())
+LineTerminator: String = {
+   r"\u000A|\u000D|\u2028|\u2029" => <>.to_string()
+};
+
+Comment: String = {
+  r"//[^\u000A\u000D\u2028\u2029]*" => <>.to_string()
 };

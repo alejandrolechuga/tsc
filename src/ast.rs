@@ -1,4 +1,4 @@
 pub enum Node {
-    Comment(String),
+    SingleLineComment(String),
     Whitespace(String),
 }
