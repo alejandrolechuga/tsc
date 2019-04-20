@@ -1,0 +1,16 @@
+use node::Node;
+
+grammar;
+
+pub InputElementDiv: Node = {
+  Comment,
+  Whitespace,
+};
+
+Comment: Node = {
+  r"//" => Node::Comment("comment")
+};
+
+Whitespace: Node = {
+  r"\x09|\x0b|\x0C|\x20|\xA0|\xFEFF|\p{Space_Separator}" => Node::Whitespace(<>.to_string())
+};
