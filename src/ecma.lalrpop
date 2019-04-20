@@ -1,19 +1,21 @@
+use ast::Node;
+
 grammar;
 
-pub InputElementDiv: String = {
+pub InputElementDiv: Node = {
   Whitespace,
   LineTerminator,
   Comment,
 };
 
-Whitespace: String = {
-  r"\x09|\x0B|\x0C|\xFEFF|\p{Space_Separator}" => <>.to_string()
+Whitespace: Node = {
+  r"\x09|\x0B|\x0C|\xFEFF|\p{Space_Separator}" => Node::Whitespace(<>.to_string())
 };
 
-LineTerminator: String = {
-   r"\u000A|\u000D|\u2028|\u2029" => <>.to_string()
+LineTerminator: Node = {
+   r"\u000A|\u000D|\u2028|\u2029" => Node::Whitespace(<>.to_string())
 };
 
-Comment: String = {
-  r"//[^\u000A\u000D\u2028\u2029]*" => <>.to_string()
+Comment: Node = {
+  r"//[^\u000A\u000D\u2028\u2029]*" => Node::Comment(false, <>.to_string())
 };

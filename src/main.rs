@@ -1,18 +1,14 @@
+pub mod ast;
+
 #[macro_use]
 extern crate lalrpop_util;
 
 lalrpop_mod!(pub ecma);
 
 #[test]
-fn input_element_div() {
-    let comment = ecma::InputElementDivParser::new().parse("//this is a comment").unwrap();
-    assert_eq!(comment, "//this is a comment");
-}
-
-#[test]
-fn comment_newline() {
-    let comment = ecma::InputElementDivParser::new().parse("//comment\n").unwrap();
-    assert_eq!(comment, "//comment");
+fn comment_single() {
+    assert!(ecma::InputElementDivParser::new().parse("//this is a comment").is_ok());
+    assert!(ecma::InputElementDivParser::new().parse("//comment\n").is_ok());
 }
 
 // #[test]
