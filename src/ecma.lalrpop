@@ -1,4 +1,4 @@
-use ast::Node;
+use ast::{AssignmentOperator,Comparator,Literal,Operator,Node,Punctuator};
 
 grammar;
 
@@ -6,6 +6,9 @@ pub InputElementDiv: Node = {
   Whitespace,
   LineTerminator,
   Comment,
+  CommonToken,
+  DivPunctuator,
+  RightBracePunctuator
 };
 
 Whitespace: Node = {
@@ -27,4 +30,96 @@ SingleLineComment: Node = {
 
 MultiLineComment: Node = {
     r"/\*((?:\*[^/])|[^*])*\*/" => Node::Comment(true, <>.to_string())
+};
+
+DivPunctuator: Node = {
+  "/" => Node::Operator(Operator::Divide),
+  "/=" => Node::AssignmentOperator(AssignmentOperator::Divide),
+}
+
+RightBracePunctuator: Node = {
+  "}" => Node::Punctuator(Punctuator::RightBrace),
+};
+
+CommonToken: Node = {
+  IdentifierName,
+  Punctuator,
+  NumericLiteral,
+//   StringLiteral,
+//   Template,
+}
+
+// TODO Unicode escape sequences
+IdentifierName: Node = {
+  r"\p{ID_Start}|\$|_(?:\p{ID_Continue}|\$|\u200C|\u200D)*" => Node::Identifier(<>.to_string())
+}
+
+NumericLiteral: Node = {
+  // DecimalLiteral,
+  BinaryIntegerLiteral,
+  OctalIntegerLiteral,
+  HexIntegerLiteral,
+};
+
+BinaryIntegerLiteral: Node = {
+  r"0[bB][01]+" => Node::Literal(Literal::Numeric(<>.to_string()))
+};
+
+OctalIntegerLiteral: Node = {
+  r"0[oO][0-7]+" => Node::Literal(Literal::Numeric(<>.to_string()))
+};
+
+HexIntegerLiteral: Node = {
+  r"0[xX][0-9a-fA-F]+" => Node::Literal(Literal::Numeric(<>.to_string()))
+};
+
+Punctuator: Node = {
+  "{" =>    Node::Punctuator(Punctuator::LeftBrace),
+  "(" =>    Node::Punctuator(Punctuator::LeftParen),
+  ")" =>    Node::Punctuator(Punctuator::RightParen),
+  "[" =>    Node::Punctuator(Punctuator::LeftBracket),
+  "]" =>    Node::Punctuator(Punctuator::RightBracket),
+  "." =>    Node::Punctuator(Punctuator::Dot),
+  "..." =>  Node::Punctuator(Punctuator::Ellipsis),
+  ";" =>    Node::Punctuator(Punctuator::Semicolon),
+  "," =>    Node::Punctuator(Punctuator::Comma),
+  "<" =>    Node::Comparator(Comparator::LT),
+  ">" =>    Node::Comparator(Comparator::GT),
+  "<=" =>   Node::Comparator(Comparator::LTE),
+  ">=" =>   Node::Comparator(Comparator::GTE),
+  "==" =>   Node::Comparator(Comparator::EQ),
+  "!=" =>   Node::Comparator(Comparator::NEQ),
+  "===" =>  Node::Comparator(Comparator::EEQ),
+  "!==" =>  Node::Comparator(Comparator::NEEQ),
+  "+" =>    Node::Operator(Operator::Plus),
+  "-" =>    Node::Operator(Operator::Minus),
+  "*" =>    Node::Operator(Operator::Times),
+  "%" =>    Node::Operator(Operator::Mod),
+  "**" =>   Node::Operator(Operator::Pow),
+  "++" =>   Node::Operator(Operator::Inc),
+  "--" =>   Node::Operator(Operator::Dec),
+  "<<" =>   Node::Operator(Operator::ShiftLeft),
+  ">>" =>   Node::Operator(Operator::ShiftRight),
+  ">>>" =>  Node::Operator(Operator::ShiftRightRight),
+  "&" =>    Node::Operator(Operator::BinaryAnd),
+  "|" =>    Node::Operator(Operator::BinaryOr),
+  "^" =>    Node::Operator(Operator::BinaryNot),
+  "!" =>    Node::Operator(Operator::LogicalNot),
+  "~" =>    Node::Punctuator(Punctuator::Tilde),
+  "&&" =>   Node::Operator(Operator::LogicalAnd),
+  "||" =>   Node::Operator(Operator::LogicalOr),
+  "?" =>    Node::Punctuator(Punctuator::Question),
+  ":" =>    Node::Punctuator(Punctuator::Colon),
+  "=" =>    Node::AssignmentOperator(AssignmentOperator::Equals),
+  "+=" =>   Node::AssignmentOperator(AssignmentOperator::Plus),
+  "*=" =>   Node::AssignmentOperator(AssignmentOperator::Times),
+  "%=" =>   Node::AssignmentOperator(AssignmentOperator::Mod),
+  "**=" =>  Node::AssignmentOperator(AssignmentOperator::Pow),
+  "<<=" =>  Node::AssignmentOperator(AssignmentOperator::ShiftLeft),
+  ">>=" =>  Node::AssignmentOperator(AssignmentOperator::ShiftRight),
+  ">>>=" => Node::AssignmentOperator(AssignmentOperator::ShiftRightRight),
+  "&=" =>   Node::AssignmentOperator(AssignmentOperator::BinaryAnd),
+  "|=" =>   Node::AssignmentOperator(AssignmentOperator::BinaryOr),
+  "^=" =>   Node::AssignmentOperator(AssignmentOperator::BinaryNot),
+  "=>" =>   Node::Punctuator(Punctuator::Arrow),
 };
