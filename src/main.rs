@@ -11,6 +11,14 @@ fn comment_single() {
     assert!(ecma::InputElementDivParser::new().parse("//comment\n").is_ok());
 }
 
+#[test]
+fn comment_multi() {
+    assert!(ecma::InputElementDivParser::new().parse("/**/").is_ok());
+    assert!(ecma::InputElementDivParser::new().parse("/*comment*/").is_ok());
+    assert!(ecma::InputElementDivParser::new().parse("/*com*m/ent*/").is_ok());
+    assert!(ecma::InputElementDivParser::new().parse("/*com\nment*/").is_ok());
+}
+
 // #[test]
 // fn ws() {
 //     let ws = ecma::InputElementDivParser::new().parse(" ").unwrap();

@@ -17,5 +17,14 @@ LineTerminator: Node = {
 };
 
 Comment: Node = {
+  SingleLineComment,
+  MultiLineComment
+};
+
+SingleLineComment: Node = {
   r"//[^\u000A\u000D\u2028\u2029]*" => Node::Comment(false, <>.to_string())
+};
+
+MultiLineComment: Node = {
+    r"/\*((?:\*[^/])|[^*])*\*/" => Node::Comment(true, <>.to_string())
 };
