@@ -45,7 +45,7 @@ CommonToken: Node = {
   IdentifierName,
   Punctuator,
   NumericLiteral,
-//   StringLiteral,
+  StringLiteral,
 //   Template,
 }
 
@@ -55,10 +55,33 @@ IdentifierName: Node = {
 }
 
 NumericLiteral: Node = {
-  // DecimalLiteral,
+  DecimalLiteral,
   BinaryIntegerLiteral,
   OctalIntegerLiteral,
   HexIntegerLiteral,
+};
+
+DecimalLiteral: Node = {
+  <i:DecimalIntegerLiteral?> <d:r"\.[0-9]*"> <e:ExponentPart?> => {
+    let mut s = "".to_string();
+    i.map(|x| s += x.as_str());
+    s += d;
+    e.map(|x| s += x.as_str());
+    Node::Literal(Literal::Numeric(s))
+  },
+  <i:DecimalIntegerLiteral> <e:ExponentPart?> => {
+    let mut s = i;
+    e.map(|x| s += x.as_str());
+    Node::Literal(Literal::Numeric(s))
+  }
+};
+
+DecimalIntegerLiteral: String = {
+  r"0|[1-9][0-9]*" => <>.to_string()
+};
+
+ExponentPart: String = {
+  r"[eE][+-]?[0-9]+" => <>.to_string()
 };
 
 BinaryIntegerLiteral: Node = {
@@ -71,6 +94,19 @@ OctalIntegerLiteral: Node = {
 
 HexIntegerLiteral: Node = {
   r"0[xX][0-9a-fA-F]+" => Node::Literal(Literal::Numeric(<>.to_string()))
+};
+
+StringLiteral: Node = {
+  "\"" <s:DoubleStringCharacters> "\"" => Node::Literal(Literal::String(s))
+  "'" <s:SingleStringCharacters> "'" => Node::Literal(Literal::String(s))
+};
+
+DoubleStringCharacters: String = {
+  r"[^\\"]*" => <>.to_string() // "
+};
+
+SingleStringCharacters: String = {
+  r"[^']*" => <>.to_string()
 };
 
 Punctuator: Node = {
