@@ -1,5 +1,6 @@
 pub enum Literal {
     Numeric(String),
+    String(String),
 }
 
 pub enum Operator {
