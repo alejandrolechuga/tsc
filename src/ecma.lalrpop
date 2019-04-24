@@ -1,3 +1,4 @@
+use std::vec;
 use ast::{AssignmentOperator,Comparator,Literal,Operator,Node,Punctuator};
 
 grammar;
@@ -81,12 +82,34 @@ HexIntegerLiteral: Node = {
 
 StringLiteral: Node = {
   // "\"" <s:DoubleStringCharacters> "\"" => Node::Literal(Literal::String(s))
-  r"'(?:[^'/\u000A\u000D\u2028\u2029]|\\(?:CharacterEscapeSequence|0[^0-9]|HexEscapeSequence|UnicodeEscapeSequence)|\\[\u000A\u2028\u2029]|\u000D\u000A|\u000D[^\u000A])*'"  => Node::Literal(Literal::String(<>.to_string()))
+  "'" <s:SingleStringCharacters*> "'" => {
+    let s = s.fold(|acc, x| acc.push_str(x));
+    Node::Literal(Literal::String(s))
+  }
 };
 
-// DoubleStringCharacters: String = {
-//   r"[^\\"]*" => <>.to_string() // "
-// };
+SingleStringCharacters: String = {
+  r"[^'\\u000A\u000D\u2028\u2029]" => <>.to_string(),
+  "\\" <s:EscapeSequence> => s,
+  "\\" <s:LineTerminatorSequence> => s
+};
+
+EscapeSequence: String = {
+  CharacterEscapeSequence,
+  r"0[^0-9]" => <>.to_string(),
+  r"x[a-fA-F0-9]{2}" => <>.to_string(),
+  r"u[a-fA-F0-9]{4}" => <>.to_string(),
+  r"u\{[a-fA-F0-9]\}{4}" => <>.to_string(),
+};
+
+CharacterEscapeSequence: String = {
+  r#"['"bfnrtv]"# => <>.to_string(),
+  r#"[^xu0-9'"bfnrtv\u000A\u000D\u2028\u2029]"# => <>.to_string()
+};
+
+LineTerminatorSequence: String = {
+  r"\u000A|\u2028|\u2029|\u000D\u000A|\u000D" => <>.to_string()
+};
 
 Punctuator: Node = {
   "{"    => Node::Punctuator(Punctuator::LeftBrace),
