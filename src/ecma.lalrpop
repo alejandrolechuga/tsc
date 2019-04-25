@@ -43,7 +43,7 @@ CommonToken: Node = {
   Punctuator,
   NumericLiteral,
   StringLiteral,
-//   Template,
+  // Template,
 }
 
 NumericLiteral: Node = {
@@ -81,35 +81,63 @@ HexIntegerLiteral: Node = {
 };
 
 StringLiteral: Node = {
-  // "\"" <s:DoubleStringCharacters> "\"" => Node::Literal(Literal::String(s))
-  "'" <s:SingleStringCharacters*> "'" => {
-    let s = s.fold(|acc, x| acc.push_str(x));
+  "\"" <s:DoubleStringCharacters*> "\"" => {
+    let s = s.iter().fold("".to_string(), |mut acc, x| {
+      acc.push_str(x);
+      acc
+    });
     Node::Literal(Literal::String(s))
+  },
+  "'" <s:SingleStringCharacters*> "'" => {
+    let s = s.iter().fold("".to_string(), |mut acc, x| {
+      acc.push_str(x);
+      acc
+    });
+    Node::Literal(Literal::String(s.to_string()))
   }
 };
 
 SingleStringCharacters: String = {
+  SingleStringSourceCharacter,
+  EscapeSequence,
+  LineTerminatorSequence,
+};
+
+SingleStringSourceCharacter: String = {
   r"[^'\\u000A\u000D\u2028\u2029]" => <>.to_string(),
-  "\\" <s:EscapeSequence> => s,
-  "\\" <s:LineTerminatorSequence> => s
+};
+
+DoubleStringCharacters: String = {
+  DoubleStringSourceCharacter,
+  EscapeSequence,
+  LineTerminatorSequence,
+};
+
+DoubleStringSourceCharacter: String = {
+  r#"[^"\\u000A\u000D\u2028\u2029]"# => <>.to_string(),
 };
 
 EscapeSequence: String = {
   CharacterEscapeSequence,
-  r"0[^0-9]" => <>.to_string(),
-  r"x[a-fA-F0-9]{2}" => <>.to_string(),
-  r"u[a-fA-F0-9]{4}" => <>.to_string(),
-  r"u\{[a-fA-F0-9]\}{4}" => <>.to_string(),
+  r"\\0[^0-9]" => <>.to_string(),
+  r"\\x[a-fA-F0-9]{2}" => <>.to_string(),
+  r"\\u[a-fA-F0-9]{4}" => <>.to_string(),
+  r"\\u\{[a-fA-F0-9]\}{4}" => <>.to_string(),
 };
 
 CharacterEscapeSequence: String = {
-  r#"['"bfnrtv]"# => <>.to_string(),
-  r#"[^xu0-9'"bfnrtv\u000A\u000D\u2028\u2029]"# => <>.to_string()
+  r#"\\['"bfnrtv]"# => <>.to_string(),
+  r#"\\[^xu0-9'"bfnrtv\u000A\u000D\u2028\u2029]"# => <>.to_string()
 };
 
 LineTerminatorSequence: String = {
   r"\u000A|\u2028|\u2029|\u000D\u000A|\u000D" => <>.to_string()
 };
+
+// Template: Node = {
+//   r"`[]*`" => <>.to_string(),
+//   r"`${`" => <>.to_string(),
+// };
 
 Punctuator: Node = {
   "{"    => Node::Punctuator(Punctuator::LeftBrace),
