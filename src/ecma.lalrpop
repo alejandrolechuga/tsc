@@ -42,7 +42,7 @@ CommonToken: Node = {
   Punctuator,
   NumericLiteral,
   StringLiteral,
-  // Template,
+  Template,
 }
 
 NumericLiteral: Node = {
@@ -90,6 +90,10 @@ SingleStringCharacters: String = {
 
 DoubleStringCharacters: String = {
   r#""(?:[^"\\x0A\x0D\u2028\u2029]|(?:\\(?:['"bfnrtv0]|x[a-fA-F0-9]{2}|u[a-fA-F0-9]{2}|u\\\{[a-fA-F0-9]\}{4}))|(?:\\[\x0A|\u2028|\u2029|\x0D\x0A|\x0D]))*""# => <>.to_string(),
+};
+
+Template: Node = {
+  r"`(?:[^`](?:\$\{)|`)*" => Node::Literal(Literal::Template(<>.to_string())),
 };
 
 Punctuator: Node = {
