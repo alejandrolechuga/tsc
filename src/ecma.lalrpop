@@ -163,7 +163,22 @@ Punctuator: Node = {
 };
 
 RegularExpressionLiteral: Node = {
-    r"/(?:[^*\\/[LineTerminator]|\\[^LineTerminator]|\[(?:)*\])(?:)*/(?:\p{ID_Continue}|\$|($:\\u\{?[a-fA-F0-9]{4}\}?)|\u200C|\u200D)*" => Node::Literal(Literal::RegExp(<>.to_string()))
+    r"(?x)
+    /
+    # RegularExpressionFirstChar
+    (?:
+        # RegularExpressionNonTerminator
+        [^\x0A\x0D\u2028\u2029*/\\\[]
+        # RegularExpressionBackslashSequence
+        |\\[^\x0a\x0D\u2028\u2029]
+        # RegularExpressionClass
+        |\[(?:[^])*\]
+    )
+    # RegularExpressionChar*
+    /
+    # RegularExpressionFlags
+    (?:\p{ID_Continue}|\$|($:\\u\{?[a-fA-F0-9]{4}\}?)|\u200C|\u200D)*
+" => Node::Literal(Literal::RegExp(<>.to_string()))
 };
 
 // vim: ft=rust
