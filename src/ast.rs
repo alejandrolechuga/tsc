@@ -2,6 +2,7 @@ pub enum Literal {
     Numeric(String),
     String(String),
     Template(String),
+    RegExp(String),
 }
 
 pub enum Operator {

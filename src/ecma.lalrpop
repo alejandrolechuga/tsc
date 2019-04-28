@@ -3,8 +3,6 @@ use ast::{AssignmentOperator,Comparator,Literal,Operator,Node,Punctuator};
 grammar;
 
 match {
-  r"\x09|\x0B|\x0C|\xFEFF|\p{Space_Separator}" => Whitespace,
-  r"\u000A|\u000D|\u2028|\u2029" => LineTerminator,
   r"0|[1-9][0-9]*" => DecimalIntegerLiteral,
   r"[eE][+-]?[0-9]+" => ExponentPart,
   r"//[^\u000A\u000D\u2028\u2029]*" => SingleLineComment,
@@ -20,7 +18,24 @@ pub InputElementDiv: Node = {
   Comment,
   CommonToken,
   DivPunctuator,
-  RightBracePunctuator
+  RightBracePunctuator,
+};
+
+pub InputElementRegExp: Node = {
+  Whitespace,
+  LineTerminator,
+  Comment,
+  CommonToken,
+  RightBracePunctuator,
+  RegularExpressionLiteral,
+};
+
+Whitespace: Node = {
+  r"\x09|\x0B|\x0C|\xFEFF|\p{Space_Separator}" => <>.to_string(),
+};
+
+LineTerminator: Node = {
+  r"\u000A|\u000D|\u2028|\u2029" => <>.to_string(),
 };
 
 Comment: Node = {
@@ -145,4 +160,8 @@ Punctuator: Node = {
   "&="   => Node::AssignmentOperator(AssignmentOperator::BinaryAnd),
   "|="   => Node::AssignmentOperator(AssignmentOperator::BinaryOr),
   "^="   => Node::AssignmentOperator(AssignmentOperator::BinaryNot),
+};
+
+RegularExpressionLiteral: Node = {
+  r"/(?:[^*\\/[LineTerminator]|\\[^LineTerminator]|\[(?:)*\])(?:)*/(?:\p{ID_Continue}|\$|($:\\u\{?[a-fA-F0-9]{4}\}?)|\u200C|\u200D)*" => Node::Literal(Literal::RegExp(<>.to_string()))
 };
