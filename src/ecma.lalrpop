@@ -13,8 +13,8 @@ match {
 }
 
 pub InputElementDiv: Node = {
-    Whitespace => Node::Whitespace(<>.to_string()),
-    LineTerminator => Node::Whitespace(<>.to_string()),
+    Whitespace,
+    LineTerminator,
     Comment,
     CommonToken,
     DivPunctuator,
@@ -31,11 +31,11 @@ pub InputElementRegExp: Node = {
 };
 
 Whitespace: Node = {
-    r"\x09|\x0B|\x0C|\xFEFF|\p{Space_Separator}" => <>.to_string(),
+    r"\x09|\x0B|\x0C|\xFEFF|\p{Space_Separator}" => Node::Whitespace(<>.to_string()),
 };
 
 LineTerminator: Node = {
-    r"\u000A|\u000D|\u2028|\u2029" => <>.to_string(),
+    r"\u000A|\u000D|\u2028|\u2029" => Node::Whitespace(<>.to_string()),
 };
 
 Comment: Node = {
@@ -169,15 +169,27 @@ RegularExpressionLiteral: Node = {
     (?:
         # RegularExpressionNonTerminator
         [^\x0A\x0D\u2028\u2029*/\\\[]
+
         # RegularExpressionBackslashSequence
-        |\\[^\x0a\x0D\u2028\u2029]
+        |\\[^\x0A\x0D\u2028\u2029]
+
         # RegularExpressionClass
-        |\[(?:[^])*\]
+        |\[(?:(?:[^\x0A\x0D\u2028\u2029\]\\])|\\[^\x0A\x0D\u2028\u2029])*\]
     )
     # RegularExpressionChar*
+    (?:
+        # RegularExpressionNonTerminator
+        [^\x0A\x0D\u2028\u2029/\\\[]
+
+        # RegularExpressionBackslashSequence
+        |\\[^\x0A\x0D\u2028\u2029]
+
+        # RegularExpressionClass
+        |\[(?:(?:[^\x0A\x0D\u2028\u2029\]\\])|\\[^\x0A\x0D\u2028\u2029])*\]
+    )*
     /
     # RegularExpressionFlags
-    (?:\p{ID_Continue}|\$|($:\\u\{?[a-fA-F0-9]{4}\}?)|\u200C|\u200D)*
+    (?:\p{ID_Continue}|\$|(?:\\u\{?[a-fA-F0-9]{4}\}?)|\u200C|\u200D)*
 " => Node::Literal(Literal::RegExp(<>.to_string()))
 };
 
