@@ -3,6 +3,7 @@ pub enum Literal {
     String(String),
     Template(String),
     RegExp(String),
+    TemplateTail(String),
 }
 
 pub enum Operator {

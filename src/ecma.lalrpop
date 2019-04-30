@@ -30,6 +30,24 @@ pub InputElementRegExp: Node = {
     RegularExpressionLiteral,
 };
 
+pub InputElementRegExpOrTemplateTail: Node = {
+    Whitespace,
+    LineTerminator,
+    Comment,
+    CommonToken,
+    RegularExpressionLiteral,
+    TemplateSubstitutionTail,
+};
+
+pub InputElementTemplateTail: Node = {
+    Whitespace,
+    LineTerminator,
+    Comment,
+    CommonToken,
+    RegularExpressionLiteral,
+    TemplateSubstitutionTail,
+};
+
 Whitespace: Node = {
     r"\x09|\x0B|\x0C|\xFEFF|\p{Space_Separator}" => Node::Whitespace(<>.to_string()),
 };
@@ -191,6 +209,19 @@ RegularExpressionLiteral: Node = {
     # RegularExpressionFlags
     (?:\p{ID_Continue}|\$|(?:\\u\{?[a-fA-F0-9]{4}\}?)|\u200C|\u200D)*
 " => Node::Literal(Literal::RegExp(<>.to_string()))
+};
+
+TemplateSubstitutionTail: Node = {
+    TemplateMiddle,
+    TemplateTail,
+};
+
+TemplateMiddle: Node = {
+    r"\}(?:TemplateCharacters)*\$\{" => Node::Literal(Literal::TemplateTail(<>.to_string()))
+};
+
+TemplateTail: Node = {
+    r"\}(?:TemplateCharacters)*" => Node::Literal(Literal::TemplateTail(<>.to_string()))
 };
 
 // vim: ft=rust
