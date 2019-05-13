@@ -55,11 +55,10 @@ impl<'input> Lexer<'input> {
     }
 }
 
-fn comment<I>(loc: Location, stream: I) -> Token where I: IntoIterator<Item = char> {
+fn comment<I>(loc: Location, stream: &mut I) -> Token where I: Iterator<Item = char> {
     let mut s = String::new();
-    let mut it = stream.into_iter();
     loop {
-        match it.next() {
+        match stream.next() {
             Some(c) if is_line_terminator(c) => break,
             Some(c) => s.push(c),
             None => break,
@@ -68,10 +67,10 @@ fn comment<I>(loc: Location, stream: I) -> Token where I: IntoIterator<Item = ch
     Token::new(loc, TokenType::Comment(s))
 }
 
-fn ws<I>(loc: Location, stream: I) -> Token where I: IntoIterator<Item = char> {
+fn ws<I>(loc: Location, stream: &mut I) -> Token where I: Iterator<Item = char> {
     let mut s = String::new();
     loop {
-        match stream.into_iter().next() {
+        match stream.next() {
             Some(c) if is_ws(c) => s.push(c),
             _ => break
         }
@@ -120,8 +119,9 @@ impl<'input> Iterator for Lexer<'input> {
 
     fn next(&mut self) -> Option<Result<Token, LexError>> {
         let loc = self.get_location();
-        match self.peek() {
-            Some(x) if is_ws(*x) => Some(Ok(ws(loc, &mut self.stream))),
+        let next = self.peek().map(|x| (*x));
+        match next {
+            Some(x) if is_ws(x) => Some(Ok(ws(loc, &mut self.stream))),
             Some('/') => Some(Ok(comment(loc, &mut self.stream))),
             None => None,
             _ => Some(Err(LexError::UnexpectedCharacter(self.get_location()))),
