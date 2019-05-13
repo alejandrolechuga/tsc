@@ -1,4 +1,3 @@
-use regex::Regex;
 use std::iter::Peekable;
 use std::str::Chars;
 
@@ -47,24 +46,72 @@ impl<'input> Lexer<'input> {
         }
     }
 
-    fn is_ws(c: &char) -> bool {
-        lazy_static! {
-            static ref RE: Regex = Regex::new(r"[\u0009\u000B\u000C\u0020\u00A0\uFEFF\p{Space_Separator}]").unwrap();
-        }
-
-        RE.is_match(&format!("{}", c))
+    fn peek(&mut self) -> Option<&char> {
+        self.stream.peek()
     }
 
-    fn ws(&mut self) -> Token {
-        let l = self.get_location();
-        let mut s = String::new();
-        loop {
-            match self.stream.peek() {
-                Some(c) if Lexer::is_ws(c) => s.push(*c),
-                _ => break
-            }
+    fn comment_or_regex(&mut self) -> Result<Token, LexError> {
+        Ok(Token::new(self.get_location(), TokenType::WhiteSpace("".to_string())))
+    }
+}
+
+fn comment<I>(loc: Location, stream: I) -> Token where I: IntoIterator<Item = char> {
+    let mut s = String::new();
+    let mut it = stream.into_iter();
+    loop {
+        match it.next() {
+            Some(c) if is_line_terminator(c) => break,
+            Some(c) => s.push(c),
+            None => break,
         }
-        Token::new(l, TokenType::WhiteSpace(s))
+    }
+    Token::new(loc, TokenType::Comment(s))
+}
+
+fn ws<I>(loc: Location, stream: I) -> Token where I: IntoIterator<Item = char> {
+    let mut s = String::new();
+    loop {
+        match stream.into_iter().next() {
+            Some(c) if is_ws(c) => s.push(c),
+            _ => break
+        }
+    }
+    Token::new(loc, TokenType::WhiteSpace(s))
+}
+
+fn is_line_terminator(c: char) -> bool {
+    match c {
+        '\u{000A}' => true,
+        '\u{000D}' => true,
+        '\u{2028}' => true,
+        '\u{2029}' => true,
+        _          => false,
+    }
+}
+
+fn is_ws(c: char) -> bool {
+    match c {
+        '\u{0009}' => true,
+        '\u{000B}' => true,
+        '\u{000C}' => true,
+        '\u{0020}' => true,
+        '\u{00A0}' => true,
+        '\u{1680}' => true,
+        '\u{2000}' => true,
+        '\u{2001}' => true,
+        '\u{2002}' => true,
+        '\u{2003}' => true,
+        '\u{2004}' => true,
+        '\u{2005}' => true,
+        '\u{2006}' => true,
+        '\u{2007}' => true,
+        '\u{2008}' => true,
+        '\u{2009}' => true,
+        '\u{200A}' => true,
+        '\u{202F}' => true,
+        '\u{205F}' => true,
+        '\u{FEFF}' => true,
+        _          => false,
     }
 }
 
@@ -72,14 +119,12 @@ impl<'input> Iterator for Lexer<'input> {
     type Item = Result<Token, LexError>;
 
     fn next(&mut self) -> Option<Result<Token, LexError>> {
-        match self.next_char() {
-            Some(x) if Lexer::is_ws(&x) => Some(Ok(self.ws())),
-            _ => None
+        let loc = self.get_location();
+        match self.peek() {
+            Some(x) if is_ws(*x) => Some(Ok(ws(loc, &mut self.stream))),
+            Some('/') => Some(Ok(comment(loc, &mut self.stream))),
+            None => None,
+            _ => Some(Err(LexError::UnexpectedCharacter(self.get_location()))),
         }
     }
-}
-
-#[test]
-fn does_not_blow_up() {
-    Lexer::new("test".chars());
 }

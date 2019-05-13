@@ -7,7 +7,8 @@ pub struct Token {
 }
 
 pub enum TokenType {
-    WhiteSpace(String)
+    Comment(String),
+    WhiteSpace(String),
 }
 
 impl Token {
