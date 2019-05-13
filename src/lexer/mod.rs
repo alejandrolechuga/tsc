@@ -50,33 +50,32 @@ impl<'input> Lexer<'input> {
         self.stream.peek()
     }
 
-    fn comment_or_regex(&mut self) -> Result<Token, LexError> {
-        Ok(Token::new(self.get_location(), TokenType::WhiteSpace("".to_string())))
+    fn comment(&mut self) -> Token {
+        let loc = self.get_location();
+        let mut s = String::new();
+        loop {
+            match self.next_char() {
+                Some(c) if is_line_terminator(c) => break,
+                Some(c) => s.push(c),
+                None => break,
+            }
+        }
+        Token::new(loc, TokenType::Comment(s))
+    }
+
+    fn ws(&mut self) -> Token {
+        let loc = self.get_location();
+        let mut s = String::new();
+        loop {
+            match self.next_char() {
+                Some(c) if is_ws(c) => s.push(c),
+                _ => break
+            }
+        }
+        Token::new(loc, TokenType::WhiteSpace(s))
     }
 }
 
-fn comment<I>(loc: Location, stream: &mut I) -> Token where I: Iterator<Item = char> {
-    let mut s = String::new();
-    loop {
-        match stream.next() {
-            Some(c) if is_line_terminator(c) => break,
-            Some(c) => s.push(c),
-            None => break,
-        }
-    }
-    Token::new(loc, TokenType::Comment(s))
-}
-
-fn ws<I>(loc: Location, stream: &mut I) -> Token where I: Iterator<Item = char> {
-    let mut s = String::new();
-    loop {
-        match stream.next() {
-            Some(c) if is_ws(c) => s.push(c),
-            _ => break
-        }
-    }
-    Token::new(loc, TokenType::WhiteSpace(s))
-}
 
 fn is_line_terminator(c: char) -> bool {
     match c {
@@ -118,11 +117,10 @@ impl<'input> Iterator for Lexer<'input> {
     type Item = Result<Token, LexError>;
 
     fn next(&mut self) -> Option<Result<Token, LexError>> {
-        let loc = self.get_location();
         let next = self.peek().map(|x| (*x));
         match next {
-            Some(x) if is_ws(x) => Some(Ok(ws(loc, &mut self.stream))),
-            Some('/') => Some(Ok(comment(loc, &mut self.stream))),
+            Some(x) if is_ws(x) => Some(Ok(self.ws())),
+            Some('/') => Some(Ok(self.comment())),
             None => None,
             _ => Some(Err(LexError::UnexpectedCharacter(self.get_location()))),
         }
