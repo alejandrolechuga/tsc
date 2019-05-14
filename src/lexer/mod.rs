@@ -5,7 +5,7 @@ mod location;
 mod token;
 
 use self::location::Location;
-use self::token::{Token, TokenType};
+use self::token::{QuoteStyle,Token,TokenType};
 
 struct Lexer<'input> {
     column: u32,
@@ -46,8 +46,12 @@ impl<'input> Lexer<'input> {
         }
     }
 
-    fn peek(&mut self) -> Option<&char> {
-        self.stream.peek()
+    fn peek(&mut self) -> Option<char> {
+        self.stream.peek().map(|x| *x)
+    }
+
+    fn skip(&mut self) {
+        self.stream.next();
     }
 
     fn comment(&mut self) -> Token {
@@ -60,6 +64,7 @@ impl<'input> Lexer<'input> {
                 None => break,
             }
         }
+        s.shrink_to_fit();
         Token::new(loc, TokenType::Comment(s))
     }
 
@@ -72,10 +77,56 @@ impl<'input> Lexer<'input> {
                 _ => break
             }
         }
+        s.shrink_to_fit();
         Token::new(loc, TokenType::WhiteSpace(s))
     }
-}
 
+    fn string(&mut self, quote: QuoteStyle) -> Result<Token, LexError> {
+        let loc = self.get_location();
+        let mut s = String::new();
+
+        loop {
+            match self.next_char() {
+                Some('"') if quote == QuoteStyle::Double => break,
+                Some('\'') if quote == QuoteStyle::Single => break,
+                Some('\\') => {
+                    match self.escape_or_line_continuation() {
+                        Ok(escape_or_continuation) => s.push_str(&escape_or_continuation),
+                        Err(x) => return Err(x),
+                    }
+                },
+                Some(c) if is_line_terminator(c) => return Err(LexError::UnexpectedCharacter(self.get_location())),
+                Some(c) => s.push(c),
+                None => return Err(LexError::UnexpectedEndOfInput(self.get_location())),
+            }
+        }
+
+        s.shrink_to_fit();
+        Ok(Token::new(loc, TokenType::String(s, quote)))
+    }
+
+    fn escape_or_line_continuation(&mut self) -> Result<String, LexError> {
+        match self.next_char() {
+            // line continuation
+            Some(c) if is_line_terminator(c) => {
+                if c == '\u{000D}' && self.peek() == Some('\u{000A}') {
+                    self.skip();
+                    let s = "\\\u{000D}\u{000A}".to_string();
+                    Ok(s)
+                } else {
+                    Ok(format!("\\{}", c))
+                }
+            },
+            // Quote
+            Some(c) if c == '"' || c == '\'' => Ok(format!("\\{}", c)),
+            // Backslash
+            Some(c) if c == '\\' => Ok(format!("\\\\")),
+            // Something else
+            Some(c) => Ok(format!("\\{}", c)),
+            None => Err(LexError::UnexpectedEndOfInput(self.get_location())),
+        }
+    }
+}
 
 fn is_line_terminator(c: char) -> bool {
     match c {
@@ -117,12 +168,14 @@ impl<'input> Iterator for Lexer<'input> {
     type Item = Result<Token, LexError>;
 
     fn next(&mut self) -> Option<Result<Token, LexError>> {
-        let next = self.peek().map(|x| (*x));
-        match next {
-            Some(x) if is_ws(x) => Some(Ok(self.ws())),
-            Some('/') => Some(Ok(self.comment())),
-            None => None,
-            _ => Some(Err(LexError::UnexpectedCharacter(self.get_location()))),
-        }
+        self.peek().map(|next| {
+            match next {
+                x if is_ws(x) => Ok(self.ws()),
+                '/'  => Ok(self.comment()),
+                '\'' => self.string(QuoteStyle::Single),
+                '"'  => self.string(QuoteStyle::Double),
+                _ => Err(LexError::UnexpectedCharacter(self.get_location())),
+            }
+        })
     }
 }

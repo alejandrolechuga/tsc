@@ -1,5 +1,11 @@
 use super::location::Location;
 
+#[derive(PartialEq)]
+pub enum QuoteStyle {
+    Single,
+    Double,
+}
+
 pub struct Token {
     pub column: u32,
     pub line: u32,
@@ -9,6 +15,7 @@ pub struct Token {
 pub enum TokenType {
     Comment(String),
     WhiteSpace(String),
+    String(String, QuoteStyle),
 }
 
 impl Token {
