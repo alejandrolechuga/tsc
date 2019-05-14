@@ -1,9 +1,19 @@
+use std::fmt;
 use super::location::Location;
 
 #[derive(PartialEq)]
 pub enum QuoteStyle {
     Single,
     Double,
+}
+
+impl fmt::Display for QuoteStyle {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            QuoteStyle::Single => write!(f, "'"),
+            QuoteStyle::Double => write!(f, "\"")
+        }
+    }
 }
 
 pub struct Token {

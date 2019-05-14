@@ -13,6 +13,7 @@ struct Lexer<'input> {
     stream: Peekable<Chars<'input>>,
 }
 
+#[derive(Debug)]
 enum LexError {
     UnexpectedEndOfInput(Location),
     UnexpectedCharacter(Location),
@@ -177,5 +178,48 @@ impl<'input> Iterator for Lexer<'input> {
                 _ => Err(LexError::UnexpectedCharacter(self.get_location())),
             }
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn identifies_whitespace() {
+        let input = " \t\t ";
+        let mut lexer = Lexer::new(input.chars());
+        let output = lexer.next();
+        assert_eq!(token_text(output), input);
+    }
+
+    #[test]
+    fn identifies_comments() {
+        let input = "// this is a comment";
+        let mut lexer = Lexer::new(input.chars());
+        let output = lexer.next();
+        assert_eq!(token_text(output), input);
+    }
+
+    #[test]
+    fn identifies_strings() {
+        let input = "'this is a string'";
+        let mut lexer = Lexer::new(input.chars());
+        let output = lexer.next();
+        assert_eq!(token_text(output), input);
+    }
+
+    fn token_text(tok: Option<Result<Token, LexError>>) -> String {
+        match tok {
+            Some(Ok(t)) => {
+                match t.typ {
+                    TokenType::WhiteSpace(s) => s,
+                    TokenType::Comment(s) => s,
+                    TokenType::String(s, qs) => format!("{}{}{}", qs, s, qs),
+                }
+            },
+            Some(Err(e)) => panic!(e),
+            None => panic!("Didn't get a token from the lexer")
+        }
     }
 }

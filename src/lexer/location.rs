@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct Location {
     pub column: u32,
     pub line: u32,
