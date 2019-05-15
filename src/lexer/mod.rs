@@ -194,33 +194,34 @@ mod tests {
     #[test]
     fn identifies_whitespace() {
         let input = " \t\t ";
-        let mut lexer = Lexer::new(input.chars());
-        let output = lexer.next();
+        let output = first_token(input);
         assert_eq!(token_text(output), input);
     }
 
     #[test]
     fn identifies_comments() {
         let input = "// this is a comment";
-        let mut lexer = Lexer::new(input.chars());
-        let output = lexer.next();
+        let output = first_token(input);
         assert_eq!(token_text(output), input);
     }
 
     #[test]
     fn identifies_single_strings() {
         let input = "'this is a string'";
-        let mut lexer = Lexer::new(input.chars());
-        let output = lexer.next();
+        let output = first_token(input);
         assert_eq!(token_text(output), input);
     }
 
     #[test]
     fn identifies_double_strings() {
         let input = r#""this is a string""#;
-        let mut lexer = Lexer::new(input.chars());
-        let output = lexer.next();
+        let output = first_token(input);
         assert_eq!(token_text(output), input);
+    }
+
+    fn first_token(input: &str) -> Option<Result<Token, LexError>> {
+        let mut lexer = Lexer::new(input.chars());
+        lexer.next()
     }
 
     fn token_text(tok: Option<Result<Token, LexError>>) -> String {
