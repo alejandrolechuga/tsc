@@ -5,7 +5,7 @@ mod location;
 mod token;
 
 use self::location::Location;
-use self::token::{QuoteStyle,Token,TokenType};
+use self::token::{CommentStyle,QuoteStyle,Token,TokenType};
 
 struct Lexer<'input> {
     column: u32,
@@ -55,9 +55,17 @@ impl<'input> Lexer<'input> {
         self.stream.next();
     }
 
-    fn comment(&mut self) -> Token {
+    fn scalar(&mut self, typ: TokenType) -> Token {
+        let loc = self.get_location();
+        self.skip();
+        Token::new(loc, typ)
+    }
+
+    // TODO multiline
+    fn comment(&mut self, style: CommentStyle) -> Token {
         let loc = self.get_location();
         let mut s = String::new();
+        self.skip();
         loop {
             match self.next_char() {
                 Some(c) if is_line_terminator(c) => break,
@@ -66,7 +74,7 @@ impl<'input> Lexer<'input> {
             }
         }
         s.shrink_to_fit();
-        Token::new(loc, TokenType::Comment(s))
+        Token::new(loc, TokenType::Comment(s, style))
     }
 
     fn ws(&mut self) -> Token {
@@ -110,6 +118,18 @@ impl<'input> Lexer<'input> {
 
         s.shrink_to_fit();
         Ok(Token::new(loc, TokenType::String(s, quote)))
+    }
+
+    fn comment_or_div(&mut self) -> Result<Token, LexError> {
+        self.skip();
+        println!("falsk");
+        match self.peek() {
+            Some('/') => Ok(self.comment(CommentStyle::SingleLine)),
+            Some('*') => Ok(self.comment(CommentStyle::MultiLine)),
+            Some('=') => Ok(self.scalar(TokenType::DivEqual)),
+            None |
+            Some(_)   => Ok(self.scalar(TokenType::Div)),
+        }
     }
 
     fn escape_or_line_continuation(&mut self) -> Result<String, LexError> {
@@ -178,9 +198,10 @@ impl<'input> Iterator for Lexer<'input> {
         self.peek().map(|next| {
             match next {
                 x if is_ws(x) => Ok(self.ws()),
-                '/'  => Ok(self.comment()),
+                '/'  => self.comment_or_div(),
                 '\'' => self.string(QuoteStyle::Single),
                 '"'  => self.string(QuoteStyle::Double),
+                '}'  => Ok(self.scalar(TokenType::RightBrace)),
                 _ => Err(LexError::UnexpectedCharacter(self.get_location())),
             }
         })
@@ -200,9 +221,9 @@ mod tests {
 
     #[test]
     fn identifies_comments() {
-        let input = "// this is a comment";
+        let input = "//this is a comment";
         let output = first_token(input);
-        assert_eq!(token_text(output), input);
+        assert_eq!(token_text(output), "this is a comment");
     }
 
     #[test]
@@ -219,6 +240,13 @@ mod tests {
         assert_eq!(token_text(output), input);
     }
 
+    #[test]
+    fn identifies_div() {
+        let input = "/";
+        let output = first_token(input);
+        assert_eq!(token_text(output), input);
+    }
+
     fn first_token(input: &str) -> Option<Result<Token, LexError>> {
         let mut lexer = Lexer::new(input.chars());
         lexer.next()
@@ -229,11 +257,14 @@ mod tests {
             Some(Ok(t)) => {
                 match t.typ {
                     TokenType::WhiteSpace(s) => s,
-                    TokenType::Comment(s) => s,
+                    TokenType::Comment(s, _) => s,
                     TokenType::String(s, qs) => format!("{}{}{}", qs, s, qs),
+                    TokenType::Div => "/".to_string(),
+                    TokenType::DivEqual => "/=".to_string(),
+                    TokenType::RightBrace => "}".to_string(),
                 }
             },
-            Some(Err(e)) => panic!(e),
+            Some(Err(e)) => panic!("{:?}", e),
             None => panic!("Didn't get a token from the lexer")
         }
     }

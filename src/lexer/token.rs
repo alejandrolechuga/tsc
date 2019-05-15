@@ -16,6 +16,11 @@ impl fmt::Display for QuoteStyle {
     }
 }
 
+pub enum CommentStyle {
+    SingleLine,
+    MultiLine,
+}
+
 pub struct Token {
     pub column: u32,
     pub line: u32,
@@ -23,9 +28,12 @@ pub struct Token {
 }
 
 pub enum TokenType {
-    Comment(String),
-    WhiteSpace(String),
+    Comment(String, CommentStyle),
+    Div,
+    DivEqual,
+    RightBrace,
     String(String, QuoteStyle),
+    WhiteSpace(String),
 }
 
 impl Token {
