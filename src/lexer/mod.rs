@@ -86,10 +86,14 @@ impl<'input> Lexer<'input> {
         let loc = self.get_location();
         let mut s = String::new();
 
+        self.skip();
+
         loop {
             match self.next_char() {
                 Some('"') if quote == QuoteStyle::Double => break,
-                Some('\'') if quote == QuoteStyle::Single => break,
+                Some('\'') if quote == QuoteStyle::Single => {
+                    break
+                },
                 Some('\\') => {
                     match self.escape_or_line_continuation() {
                         Ok(escape_or_continuation) => s.push_str(&escape_or_continuation),
@@ -97,7 +101,9 @@ impl<'input> Lexer<'input> {
                     }
                 },
                 Some(c) if is_line_terminator(c) => return Err(LexError::UnexpectedCharacter(self.get_location())),
-                Some(c) => s.push(c),
+                Some(c) => {
+                    s.push(c)
+                },
                 None => return Err(LexError::UnexpectedEndOfInput(self.get_location())),
             }
         }
@@ -202,8 +208,16 @@ mod tests {
     }
 
     #[test]
-    fn identifies_strings() {
+    fn identifies_single_strings() {
         let input = "'this is a string'";
+        let mut lexer = Lexer::new(input.chars());
+        let output = lexer.next();
+        assert_eq!(token_text(output), input);
+    }
+
+    #[test]
+    fn identifies_double_strings() {
+        let input = r#""this is a string""#;
         let mut lexer = Lexer::new(input.chars());
         let output = lexer.next();
         assert_eq!(token_text(output), input);
