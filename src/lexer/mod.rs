@@ -55,30 +55,48 @@ impl<'input> Lexer<'input> {
         self.stream.next();
     }
 
-    fn scalar(&mut self, typ: TokenType) -> Token {
-        let loc = self.get_location();
+    fn scalar(&mut self, loc: Location, typ: TokenType) -> Token {
         self.skip();
         Token::new(loc, typ)
     }
 
-    // TODO multiline
-    fn comment(&mut self, style: CommentStyle) -> Token {
-        let loc = self.get_location();
+    fn comment(&mut self, loc: Location, style: CommentStyle) -> Result<Token, LexError> {
         let mut s = String::new();
         self.skip();
-        loop {
-            match self.next_char() {
-                Some(c) if is_line_terminator(c) => break,
-                Some(c) => s.push(c),
-                None => break,
-            }
+        match style {
+            CommentStyle::SingleLine => {
+                loop {
+                    match self.next_char() {
+                        Some(c) if is_line_terminator(c) => break,
+                        Some(c) => s.push(c),
+                        None => break,
+                    }
+                }
+            },
+            CommentStyle::MultiLine => {
+                loop {
+                    match self.next_char() {
+                        Some('*') => {
+                            match self.next_char() {
+                                Some('/') => break,
+                                Some(c) => {
+                                    s.push('*');
+                                    s.push(c);
+                                },
+                                None => return Err(LexError::UnexpectedEndOfInput(loc)),
+                            }
+                        },
+                        Some(c) => s.push(c),
+                        None => return Err(LexError::UnexpectedEndOfInput(loc)),
+                    }
+                }
+            },
         }
         s.shrink_to_fit();
-        Token::new(loc, TokenType::Comment(s, style))
+        Ok(Token::new(loc, TokenType::Comment(s, style)))
     }
 
-    fn ws(&mut self) -> Token {
-        let loc = self.get_location();
+    fn ws(&mut self, loc: Location) -> Token {
         let mut s = String::new();
         loop {
             match self.next_char() {
@@ -90,8 +108,7 @@ impl<'input> Lexer<'input> {
         Token::new(loc, TokenType::WhiteSpace(s))
     }
 
-    fn string(&mut self, quote: QuoteStyle) -> Result<Token, LexError> {
-        let loc = self.get_location();
+    fn string(&mut self, loc: Location, quote: QuoteStyle) -> Result<Token, LexError> {
         let mut s = String::new();
 
         self.skip();
@@ -120,15 +137,14 @@ impl<'input> Lexer<'input> {
         Ok(Token::new(loc, TokenType::String(s, quote)))
     }
 
-    fn comment_or_div(&mut self) -> Result<Token, LexError> {
+    fn comment_or_div(&mut self, loc: Location) -> Result<Token, LexError> {
         self.skip();
-        println!("falsk");
         match self.peek() {
-            Some('/') => Ok(self.comment(CommentStyle::SingleLine)),
-            Some('*') => Ok(self.comment(CommentStyle::MultiLine)),
-            Some('=') => Ok(self.scalar(TokenType::DivEqual)),
+            Some('/') => self.comment(loc, CommentStyle::SingleLine),
+            Some('*') => self.comment(loc, CommentStyle::MultiLine),
+            Some('=') => Ok(self.scalar(loc, TokenType::DivEqual)),
             None |
-            Some(_)   => Ok(self.scalar(TokenType::Div)),
+            Some(_)   => Ok(self.scalar(loc, TokenType::Div)),
         }
     }
 
@@ -195,14 +211,15 @@ impl<'input> Iterator for Lexer<'input> {
     type Item = Result<Token, LexError>;
 
     fn next(&mut self) -> Option<Result<Token, LexError>> {
+        let loc = self.get_location();
         self.peek().map(|next| {
             match next {
-                x if is_ws(x) => Ok(self.ws()),
-                '/'  => self.comment_or_div(),
-                '\'' => self.string(QuoteStyle::Single),
-                '"'  => self.string(QuoteStyle::Double),
-                '}'  => Ok(self.scalar(TokenType::RightBrace)),
-                _ => Err(LexError::UnexpectedCharacter(self.get_location())),
+                x if is_ws(x) => Ok(self.ws(loc)),
+                '/'  => self.comment_or_div(loc),
+                '\'' => self.string(loc, QuoteStyle::Single),
+                '"'  => self.string(loc, QuoteStyle::Double),
+                '}'  => Ok(self.scalar(loc, TokenType::RightBrace)),
+                _    => Err(LexError::UnexpectedCharacter(loc)),
             }
         })
     }
@@ -243,6 +260,20 @@ mod tests {
     #[test]
     fn identifies_div() {
         let input = "/";
+        let output = first_token(input);
+        assert_eq!(token_text(output), input);
+    }
+
+    #[test]
+    fn identifies_div_equals() {
+        let input = "/=";
+        let output = first_token(input);
+        assert_eq!(token_text(output), input);
+    }
+
+    #[test]
+    fn identifies_right_brace() {
+        let input = "}";
         let output = first_token(input);
         assert_eq!(token_text(output), input);
     }
