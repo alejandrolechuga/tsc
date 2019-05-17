@@ -169,6 +169,45 @@ impl<'input> Lexer<'input> {
             None => Err(LexError::UnexpectedEndOfInput(self.get_location())),
         }
     }
+
+    fn equal(&mut self, loc: Location) -> Token {
+        self.skip();
+        match self.peek() {
+            Some('>') => {
+                self.next_char();
+                Token::new(loc, TokenType::Arrow)
+            },
+            Some('=') => {
+                self.next_char();
+                match self.peek() {
+                    Some('=') => {
+                        self.next_char();
+                        Token::new(loc, TokenType::TripleEquals)
+                    },
+                    _ => Token::new(loc, TokenType::DoubleEquals)
+                }
+            },
+            Some(_) |
+            None => Token::new(loc, TokenType::Equals)
+        }
+    }
+
+    fn bang(&mut self, loc: Location) -> Token {
+        self.skip();
+        match self.peek() {
+            Some('=') => {
+                self.next_char();
+                match self.peek() {
+                    Some('=') => {
+                        self.next_char();
+                        Token::new(loc, TokenType::NotTripleEquals)
+                    },
+                    _ => Token::new(loc, TokenType::NotEquals)
+                }
+            },
+            _ => Token::new(loc, TokenType::Bang),
+        }
+    }
 }
 
 fn is_line_terminator(c: char) -> bool {
@@ -219,6 +258,8 @@ impl<'input> Iterator for Lexer<'input> {
                 '\'' => self.string(loc, QuoteStyle::Single),
                 '"'  => self.string(loc, QuoteStyle::Double),
                 '}'  => Ok(self.scalar(loc, TokenType::RightBrace)),
+                '='  => Ok(self.equal(loc)),
+                '!'  => Ok(self.bang(loc)),
                 _    => Err(LexError::UnexpectedCharacter(loc)),
             }
         })
