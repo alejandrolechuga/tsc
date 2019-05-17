@@ -240,7 +240,7 @@ mod tests {
     fn identifies_comments() {
         let input = "//this is a comment";
         let output = first_token(input);
-        assert_eq!(token_text(output), "this is a comment");
+        assert_eq!(token_text(output), input);
     }
 
     #[test]
@@ -285,16 +285,7 @@ mod tests {
 
     fn token_text(tok: Option<Result<Token, LexError>>) -> String {
         match tok {
-            Some(Ok(t)) => {
-                match t.typ {
-                    TokenType::WhiteSpace(s) => s,
-                    TokenType::Comment(s, _) => s,
-                    TokenType::String(s, qs) => format!("{}{}{}", qs, s, qs),
-                    TokenType::Div => "/".to_string(),
-                    TokenType::DivEqual => "/=".to_string(),
-                    TokenType::RightBrace => "}".to_string(),
-                }
-            },
+            Some(Ok(t)) => t.typ.to_string(),
             Some(Err(e)) => panic!("{:?}", e),
             None => panic!("Didn't get a token from the lexer")
         }
