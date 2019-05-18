@@ -7,6 +7,26 @@ mod token;
 use self::location::Location;
 use self::token::{CommentStyle,QuoteStyle,Token,TokenType};
 
+struct CharLocations<I : Iterator<Item = char>>  {
+    line: u32,
+    col: u32,
+    iter: I,
+}
+
+impl<I : Iterator<Item = char>> CharLocations<I> {
+    fn new(iter: I) -> CharLocations<I> {
+        CharLocations { iter, line: 1, col: 1 }
+    }
+}
+
+impl<I : Iterator<Item = (u32, u32, char)>> Iterator for CharLocations<char> {
+    type Item = (u32, u32, char);
+
+    fn next(&mut self) -> Option<Self::Item> {
+
+    }
+}
+
 struct Lexer<'input> {
     column: u32,
     line: u32,
