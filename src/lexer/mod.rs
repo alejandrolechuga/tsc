@@ -1,5 +1,4 @@
 use std::iter::Peekable;
-use std::str::Chars;
 
 mod location;
 mod token;
@@ -7,30 +6,12 @@ mod token;
 use self::location::Location;
 use self::token::{CommentStyle,QuoteStyle,Token,TokenType};
 
-struct CharLocations<I : Iterator<Item = char>>  {
-    line: u32,
-    col: u32,
-    iter: I,
-}
-
-impl<I : Iterator<Item = char>> CharLocations<I> {
-    fn new(iter: I) -> CharLocations<I> {
-        CharLocations { iter, line: 1, col: 1 }
-    }
-}
-
-impl<I : Iterator<Item = (u32, u32, char)>> Iterator for CharLocations<char> {
-    type Item = (u32, u32, char);
-
-    fn next(&mut self) -> Option<Self::Item> {
-
-    }
-}
-
-struct Lexer<'input> {
+struct Lexer<I>
+where I: Iterator<Item = char>,
+{
     column: u32,
     line: u32,
-    stream: Peekable<Chars<'input>>,
+    stream: Peekable<I>,
 }
 
 #[derive(Debug)]
@@ -39,12 +20,13 @@ enum LexError {
     UnexpectedCharacter(Location),
 }
 
-impl<'input> Lexer<'input> {
-    fn new(stream: Chars<'input>) -> Lexer<'input> {
+impl<I> Lexer<I>
+{
+    fn new(stream: IntoIterator<IntoIter = Iterator<Item = char>, Item = char>) -> Lexer<I> {
         Lexer {
             column: 1,
             line: 1,
-            stream: stream.peekable()
+            stream: stream.into_iter().peekable()
         }
     }
 
@@ -266,7 +248,9 @@ fn is_ws(c: char) -> bool {
     }
 }
 
-impl<'input> Iterator for Lexer<'input> {
+impl<I> Iterator for Lexer<I>
+where I: Iterator<Item = char>
+{
     type Item = Result<Token, LexError>;
 
     fn next(&mut self) -> Option<Result<Token, LexError>> {
