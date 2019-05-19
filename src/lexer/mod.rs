@@ -21,12 +21,13 @@ enum LexError {
 }
 
 impl<I> Lexer<I>
+where I: Iterator<Item = char>,
 {
-    fn new(stream: IntoIterator<IntoIter = Iterator<Item = char>, Item = char>) -> Lexer<I> {
+    fn new(stream: I) -> Lexer<I> {
         Lexer {
             column: 1,
             line: 1,
-            stream: stream.into_iter().peekable()
+            stream: stream.peekable()
         }
     }
 
@@ -210,6 +211,176 @@ impl<I> Lexer<I>
             _ => Token::new(loc, TokenType::Bang),
         }
     }
+
+    fn ampersand(&mut self, loc: Location) -> Token {
+        self.skip();
+        match self.peek() {
+            Some('&') => {
+                self.next_char();
+                Token::new(loc, TokenType::LogicalAnd)
+            },
+            Some('=') => {
+                self.next_char();
+                Token::new(loc, TokenType::BinaryAndEquals)
+            },
+            _ => Token::new(loc, TokenType::BinaryAnd),
+        }
+    }
+
+    fn pipe(&mut self, loc: Location) -> Token {
+        self.skip();
+        match self.peek() {
+            Some('|') => {
+                self.next_char();
+                Token::new(loc, TokenType::LogicalOr)
+            },
+            Some('=') => {
+                self.next_char();
+                Token::new(loc, TokenType::BinaryOrEquals)
+            },
+            _ => Token::new(loc, TokenType::BinaryOr),
+        }
+    }
+
+    fn caret(&mut self, loc: Location) -> Token {
+        self.skip();
+        match self.peek() {
+            Some('=') => {
+                self.next_char();
+                Token::new(loc, TokenType::BinaryXorEquals)
+            },
+            _ => Token::new(loc, TokenType::BinaryXor),
+        }
+    }
+
+    fn minus(&mut self, loc: Location) -> Token {
+        self.skip();
+        match self.peek() {
+            Some('-') => {
+                self.next_char();
+                Token::new(loc, TokenType::Decrement)
+            },
+            Some('=') => {
+                self.next_char();
+                Token::new(loc, TokenType::MinusEquals)
+            },
+            _ => Token::new(loc, TokenType::Minus),
+        }
+    }
+
+    fn plus(&mut self, loc: Location) -> Token {
+        self.skip();
+        match self.peek() {
+            Some('+') => {
+                self.next_char();
+                Token::new(loc, TokenType::Increment)
+            },
+            Some('=') => {
+                self.next_char();
+                Token::new(loc, TokenType::PlusEquals)
+            },
+            _ => Token::new(loc, TokenType::Plus),
+        }
+    }
+
+    fn gt(&mut self, loc: Location) -> Token {
+        self.skip();
+        match self.peek() {
+            Some('=') => {
+                self.next_char();
+                Token::new(loc, TokenType::GreaterThanEqualTo)
+            },
+            Some('>') => {
+                self.next_char();
+                match self.peek() {
+                    Some('=') => {
+                        self.skip();
+                        Token::new(loc, TokenType::RightShiftEquals)
+                    },
+                    Some('>') => {
+                        self.skip();
+                        match self.peek() {
+                            Some('=') => {
+                                self.skip();
+                                Token::new(loc, TokenType::TripleRightShiftEquals)
+                            },
+                            _ => Token::new(loc, TokenType::TripleRightShift)
+                        }
+                    },
+                    _ => Token::new(loc, TokenType::RightShift)
+                }
+            },
+            _ => Token::new(loc, TokenType::GreaterThan)
+        }
+    }
+
+    fn lt(&mut self, loc: Location) -> Token {
+        self.skip();
+        match self.peek() {
+            Some('<') => {
+                self.next_char();
+                match self.peek() {
+                    Some('=') => {
+                        self.next_char();
+                        Token::new(loc, TokenType::LeftShiftEquals)
+                    },
+                    _ => Token::new(loc, TokenType::LeftShift)
+                }
+            },
+            Some('=') => {
+                self.next_char();
+                Token::new(loc, TokenType::LessThanEqualTo)
+            },
+            _ => Token::new(loc, TokenType::LessThan)
+        }
+    }
+
+    fn period(&mut self, loc: Location) -> Result<Token, LexError> {
+        self.skip();
+        match self.peek() {
+            Some('.') => {
+                self.next_char();
+                match self.next_char() {
+                    Some('.') => Ok(Token::new(loc, TokenType::Ellipsis)),
+                    Some(_)   => Err(LexError::UnexpectedCharacter(loc)),
+                    None      => Err(LexError::UnexpectedEndOfInput(loc)),
+                }
+            },
+            _ => Ok(Token::new(loc, TokenType::Period))
+        }
+    }
+
+    fn percent(&mut self, loc: Location) -> Token {
+        self.skip();
+        match self.peek() {
+            Some('=') => {
+                self.next_char();
+                Token::new(loc, TokenType::PercentEquals)
+            },
+            _ => Token::new(loc, TokenType::Percent)
+        }
+    }
+
+    fn asterisk(&mut self, loc: Location) -> Token {
+        self.skip();
+        match self.peek() {
+            Some('*') => {
+                self.next_char();
+                match self.peek() {
+                    Some('=') => {
+                        self.next_char();
+                        Token::new(loc, TokenType::PowerEquals)
+                    },
+                    _ => Token::new(loc, TokenType::Power)
+                }
+            },
+            Some('=') => {
+                self.next_char();
+                Token::new(loc, TokenType::TimesEquals)
+            },
+            _ => Token::new(loc, TokenType::Times)
+        }
+    }
 }
 
 fn is_line_terminator(c: char) -> bool {
@@ -261,9 +432,29 @@ where I: Iterator<Item = char>
                 '/'  => self.comment_or_div(loc),
                 '\'' => self.string(loc, QuoteStyle::Single),
                 '"'  => self.string(loc, QuoteStyle::Double),
+                '{'  => Ok(self.scalar(loc, TokenType::LeftBrace)),
                 '}'  => Ok(self.scalar(loc, TokenType::RightBrace)),
                 '='  => Ok(self.equal(loc)),
                 '!'  => Ok(self.bang(loc)),
+                '&'  => Ok(self.ampersand(loc)),
+                '|'  => Ok(self.pipe(loc)),
+                '^'  => Ok(self.caret(loc)),
+                '('  => Ok(self.scalar(loc, TokenType::LeftParen)),
+                ')'  => Ok(self.scalar(loc, TokenType::RightParen)),
+                ']'  => Ok(self.scalar(loc, TokenType::RightBracket)),
+                '['  => Ok(self.scalar(loc, TokenType::LeftBracket)),
+                ':'  => Ok(self.scalar(loc, TokenType::Colon)),
+                ','  => Ok(self.scalar(loc, TokenType::Comma)),
+                '+'  => Ok(self.plus(loc)),
+                '-'  => Ok(self.minus(loc)),
+                '>'  => Ok(self.gt(loc)),
+                '<'  => Ok(self.lt(loc)),
+                '.'  => self.period(loc),
+                '%'  => Ok(self.percent(loc)),
+                '*'  => Ok(self.asterisk(loc)),
+                '~'  => Ok(self.scalar(loc, TokenType::Tilde)),
+                ';'  => Ok(self.scalar(loc, TokenType::Semicolon)),
+                '?'  => Ok(self.scalar(loc, TokenType::Question)),
                 _    => Err(LexError::UnexpectedCharacter(loc)),
             }
         })
