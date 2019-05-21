@@ -58,9 +58,9 @@ where I: Iterator<Item = char>,
         self.next_char();
     }
 
-    fn scalar(&mut self, loc: Location, typ: TokenType) -> Token {
+    fn scalar(&mut self, loc: Location, typ: TokenType) -> Result<Token, LexError> {
         self.skip();
-        Token::new(loc, typ)
+        Ok(Token::new(loc, typ))
     }
 
     fn comment(&mut self, loc: Location, style: CommentStyle) -> Result<Token, LexError> {
@@ -111,43 +111,40 @@ where I: Iterator<Item = char>,
         Token::new(loc, TokenType::WhiteSpace(s))
     }
 
-    fn string(&mut self, loc: Location, quote: QuoteStyle) -> Result<Token, LexError> {
+    fn string(&mut self, quote: QuoteStyle) -> Result<TokenType, LexError> {
         let mut s = String::new();
 
+        // Skip leading quote
         self.skip();
 
         loop {
             match self.next_char() {
                 Some('"') if quote == QuoteStyle::Double => break,
-                Some('\'') if quote == QuoteStyle::Single => {
-                    break
-                },
+                Some('\'') if quote == QuoteStyle::Single => break,
                 Some('\\') => {
                     match self.escape_or_line_continuation() {
-                        Ok(escape_or_continuation) => s.push_str(&escape_or_continuation),
+                        Ok(escape) => s.push_str(&escape),
                         Err(x) => return Err(x),
                     }
                 },
                 Some(c) if is_line_terminator(c) => return Err(LexError::UnexpectedCharacter(self.get_location())),
-                Some(c) => {
-                    s.push(c)
-                },
+                Some(c) => s.push(c),
                 None => return Err(LexError::UnexpectedEndOfInput(self.get_location())),
             }
         }
 
         s.shrink_to_fit();
-        Ok(Token::new(loc, TokenType::String(s, quote)))
+        Ok(TokenType::String(s, quote))
     }
 
-    fn comment_or_div(&mut self, loc: Location) -> Result<Token, LexError> {
+    fn slash(&mut self, loc: Location) -> Result<Token, LexError> {
         self.skip();
         match self.peek() {
             Some('/') => self.comment(loc, CommentStyle::SingleLine),
             Some('*') => self.comment(loc, CommentStyle::MultiLine),
-            Some('=') => Ok(self.scalar(loc, TokenType::DivEqual)),
+            Some('=') => self.scalar(loc, TokenType::DivEqual),
             None |
-            Some(_)   => Ok(self.scalar(loc, TokenType::Div)),
+            Some(_)   => self.scalar(loc, TokenType::Div),
         }
     }
 
@@ -361,25 +358,26 @@ where I: Iterator<Item = char>,
         }
     }
 
-    fn asterisk(&mut self, loc: Location) -> Token {
+    fn asterisk(&mut self) -> Result<TokenType, LexError> {
         self.skip();
-        match self.peek() {
+        let typ = match self.peek() {
             Some('*') => {
                 self.next_char();
                 match self.peek() {
                     Some('=') => {
                         self.next_char();
-                        Token::new(loc, TokenType::PowerEquals)
+                        TokenType::PowerEquals
                     },
-                    _ => Token::new(loc, TokenType::Power)
+                    _ => TokenType::Power
                 }
             },
             Some('=') => {
                 self.next_char();
-                Token::new(loc, TokenType::TimesEquals)
+                TokenType::TimesEquals
             },
-            _ => Token::new(loc, TokenType::Times)
-        }
+            _ => TokenType::Times
+        };
+        Ok(typ)
     }
 }
 
@@ -429,32 +427,32 @@ where I: Iterator<Item = char>
         self.peek().map(|next| {
             match next {
                 x if is_ws(x) => Ok(self.ws(loc)),
-                '/'  => self.comment_or_div(loc),
-                '\'' => self.string(loc, QuoteStyle::Single),
-                '"'  => self.string(loc, QuoteStyle::Double),
-                '{'  => Ok(self.scalar(loc, TokenType::LeftBrace)),
-                '}'  => Ok(self.scalar(loc, TokenType::RightBrace)),
+                '/'  => self.slash(loc),
+                '\'' => self.string(QuoteStyle::Single).map(|x| Token::new(loc, x)),
+                '"'  => self.string(QuoteStyle::Double).map(|x| Token::new(loc, x)),
+                '{'  => self.scalar(loc, TokenType::LeftBrace),
+                '}'  => self.scalar(loc, TokenType::RightBrace),
                 '='  => Ok(self.equal(loc)),
                 '!'  => Ok(self.bang(loc)),
                 '&'  => Ok(self.ampersand(loc)),
                 '|'  => Ok(self.pipe(loc)),
                 '^'  => Ok(self.caret(loc)),
-                '('  => Ok(self.scalar(loc, TokenType::LeftParen)),
-                ')'  => Ok(self.scalar(loc, TokenType::RightParen)),
-                ']'  => Ok(self.scalar(loc, TokenType::RightBracket)),
-                '['  => Ok(self.scalar(loc, TokenType::LeftBracket)),
-                ':'  => Ok(self.scalar(loc, TokenType::Colon)),
-                ','  => Ok(self.scalar(loc, TokenType::Comma)),
+                '('  => self.scalar(loc, TokenType::LeftParen),
+                ')'  => self.scalar(loc, TokenType::RightParen),
+                ']'  => self.scalar(loc, TokenType::RightBracket),
+                '['  => self.scalar(loc, TokenType::LeftBracket),
+                ':'  => self.scalar(loc, TokenType::Colon),
+                ','  => self.scalar(loc, TokenType::Comma),
                 '+'  => Ok(self.plus(loc)),
                 '-'  => Ok(self.minus(loc)),
                 '>'  => Ok(self.gt(loc)),
                 '<'  => Ok(self.lt(loc)),
                 '.'  => self.period(loc),
                 '%'  => Ok(self.percent(loc)),
-                '*'  => Ok(self.asterisk(loc)),
-                '~'  => Ok(self.scalar(loc, TokenType::Tilde)),
-                ';'  => Ok(self.scalar(loc, TokenType::Semicolon)),
-                '?'  => Ok(self.scalar(loc, TokenType::Question)),
+                '*'  => self.asterisk().map(|x| Token::new(loc, x)),
+                '~'  => self.scalar(loc, TokenType::Tilde),
+                ';'  => self.scalar(loc, TokenType::Semicolon),
+                '?'  => self.scalar(loc, TokenType::Question),
                 _    => Err(LexError::UnexpectedCharacter(loc)),
             }
         })

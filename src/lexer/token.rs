@@ -154,10 +154,6 @@ impl fmt::Display for TokenType {
 
 impl Token {
     pub fn new(loc: Location, typ: TokenType) -> Token {
-        Token {
-            column: loc.column,
-            line: loc.line,
-            typ,
-        }
+        Token { column: loc.column, line: loc.line, typ, }
     }
 }
