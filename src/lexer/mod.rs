@@ -1,10 +1,12 @@
 use std::iter::Peekable;
 
+mod lexerror;
 mod location;
 mod token;
 
 use self::location::Location;
 use self::token::{CommentStyle,QuoteStyle,Token,TokenType};
+use self::lexerror::LexError;
 
 pub struct Lexer<I>
 where I: Iterator<Item = char>,
@@ -12,12 +14,6 @@ where I: Iterator<Item = char>,
     column: u32,
     line: u32,
     stream: Peekable<I>,
-}
-
-#[derive(Debug)]
-pub enum LexError {
-    UnexpectedEndOfInput(Location),
-    UnexpectedCharacter(Location),
 }
 
 impl<I> Lexer<I>
@@ -127,7 +123,7 @@ where I: Iterator<Item = char>,
                         Err(x) => return Err(x),
                     }
                 },
-                Some(c) if is_line_terminator(c) => return Err(LexError::UnexpectedCharacter(self.get_location())),
+                Some(c) if is_line_terminator(c) => return Err(LexError::UnexpectedCharacter(self.get_location(), c)),
                 Some(c) => s.push(c),
                 None => return Err(LexError::UnexpectedEndOfInput(self.get_location())),
             }
@@ -339,7 +335,7 @@ where I: Iterator<Item = char>,
                 self.next_char();
                 match self.next_char() {
                     Some('.') => Ok(Token::new(loc, TokenType::Ellipsis)),
-                    Some(_)   => Err(LexError::UnexpectedCharacter(loc)),
+                    Some(c)   => Err(LexError::UnexpectedCharacter(loc, c)),
                     None      => Err(LexError::UnexpectedEndOfInput(loc)),
                 }
             },
@@ -358,9 +354,9 @@ where I: Iterator<Item = char>,
         }
     }
 
-    fn asterisk(&mut self) -> Result<TokenType, LexError> {
+    fn asterisk(&mut self) -> TokenType {
         self.skip();
-        let typ = match self.peek() {
+        match self.peek() {
             Some('*') => {
                 self.next_char();
                 match self.peek() {
@@ -376,44 +372,25 @@ where I: Iterator<Item = char>,
                 TokenType::TimesEquals
             },
             _ => TokenType::Times
-        };
-        Ok(typ)
+        }
     }
 }
 
 fn is_line_terminator(c: char) -> bool {
     match c {
-        '\u{000A}' => true,
-        '\u{000D}' => true,
-        '\u{2028}' => true,
-        '\u{2029}' => true,
-        _          => false,
+        '\u{000A}' | '\u{000D}' | '\u{2028}' | '\u{2029}' => true,
+        _ => false,
     }
 }
 
 fn is_ws(c: char) -> bool {
     match c {
-        '\u{0009}' => true,
-        '\u{000B}' => true,
-        '\u{000C}' => true,
-        '\u{0020}' => true,
-        '\u{00A0}' => true,
-        '\u{1680}' => true,
-        '\u{2000}' => true,
-        '\u{2001}' => true,
-        '\u{2002}' => true,
-        '\u{2003}' => true,
-        '\u{2004}' => true,
-        '\u{2005}' => true,
-        '\u{2006}' => true,
-        '\u{2007}' => true,
-        '\u{2008}' => true,
-        '\u{2009}' => true,
-        '\u{200A}' => true,
-        '\u{202F}' => true,
-        '\u{205F}' => true,
-        '\u{FEFF}' => true,
-        _          => false,
+        '\u{0009}' | '\u{000B}' | '\u{000C}' | '\u{0020}' |
+        '\u{00A0}' | '\u{1680}' | '\u{2000}' | '\u{2001}' |
+        '\u{2002}' | '\u{2003}' | '\u{2004}' | '\u{2005}' |
+        '\u{2006}' | '\u{2007}' | '\u{2008}' | '\u{2009}' |
+        '\u{200A}' | '\u{202F}' | '\u{205F}' | '\u{FEFF}' => true,
+        _ => false,
     }
 }
 
@@ -449,11 +426,11 @@ where I: Iterator<Item = char>
                 '<'  => Ok(self.lt(loc)),
                 '.'  => self.period(loc),
                 '%'  => Ok(self.percent(loc)),
-                '*'  => self.asterisk().map(|x| Token::new(loc, x)),
+                '*'  => Ok(Token::new(loc, self.asterisk())),
                 '~'  => self.scalar(loc, TokenType::Tilde),
                 ';'  => self.scalar(loc, TokenType::Semicolon),
                 '?'  => self.scalar(loc, TokenType::Question),
-                _    => Err(LexError::UnexpectedCharacter(loc)),
+                c    => Err(LexError::UnexpectedCharacter(loc, c)),
             }
         })
     }
