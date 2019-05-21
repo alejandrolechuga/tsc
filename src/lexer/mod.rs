@@ -166,29 +166,29 @@ where I: Iterator<Item = char>,
         }
     }
 
-    fn equal(&mut self, loc: Location) -> Token {
+    fn equal(&mut self) -> TokenType {
         self.skip();
         match self.peek() {
             Some('>') => {
                 self.next_char();
-                Token::new(loc, TokenType::Arrow)
+                TokenType::Arrow
             },
             Some('=') => {
                 self.next_char();
                 match self.peek() {
                     Some('=') => {
                         self.next_char();
-                        Token::new(loc, TokenType::TripleEquals)
+                        TokenType::TripleEquals
                     },
-                    _ => Token::new(loc, TokenType::DoubleEquals)
+                    _ => TokenType::DoubleEquals
                 }
             },
             Some(_) |
-            None => Token::new(loc, TokenType::Equals)
+            None => TokenType::Equals
         }
     }
 
-    fn bang(&mut self, loc: Location) -> Token {
+    fn bang(&mut self) -> TokenType {
         self.skip();
         match self.peek() {
             Some('=') => {
@@ -196,118 +196,118 @@ where I: Iterator<Item = char>,
                 match self.peek() {
                     Some('=') => {
                         self.next_char();
-                        Token::new(loc, TokenType::NotTripleEquals)
+                        TokenType::NotTripleEquals
                     },
-                    _ => Token::new(loc, TokenType::NotEquals)
+                    _ => TokenType::NotEquals
                 }
             },
-            _ => Token::new(loc, TokenType::Bang),
+            _ => TokenType::Bang
         }
     }
 
-    fn ampersand(&mut self, loc: Location) -> Token {
+    fn ampersand(&mut self) -> TokenType {
         self.skip();
         match self.peek() {
             Some('&') => {
                 self.next_char();
-                Token::new(loc, TokenType::LogicalAnd)
+                TokenType::LogicalAnd
             },
             Some('=') => {
                 self.next_char();
-                Token::new(loc, TokenType::BinaryAndEquals)
+                TokenType::BinaryAndEquals
             },
-            _ => Token::new(loc, TokenType::BinaryAnd),
+            _ => TokenType::BinaryAnd
         }
     }
 
-    fn pipe(&mut self, loc: Location) -> Token {
+    fn pipe(&mut self) -> TokenType {
         self.skip();
         match self.peek() {
             Some('|') => {
                 self.next_char();
-                Token::new(loc, TokenType::LogicalOr)
+                TokenType::LogicalOr
             },
             Some('=') => {
                 self.next_char();
-                Token::new(loc, TokenType::BinaryOrEquals)
+                TokenType::BinaryOrEquals
             },
-            _ => Token::new(loc, TokenType::BinaryOr),
+            _ => TokenType::BinaryOr
         }
     }
 
-    fn caret(&mut self, loc: Location) -> Token {
+    fn caret(&mut self) -> TokenType {
         self.skip();
         match self.peek() {
             Some('=') => {
                 self.next_char();
-                Token::new(loc, TokenType::BinaryXorEquals)
+                TokenType::BinaryXorEquals
             },
-            _ => Token::new(loc, TokenType::BinaryXor),
+            _ => TokenType::BinaryXor
         }
     }
 
-    fn minus(&mut self, loc: Location) -> Token {
+    fn minus(&mut self) -> TokenType {
         self.skip();
         match self.peek() {
             Some('-') => {
                 self.next_char();
-                Token::new(loc, TokenType::Decrement)
+                TokenType::Decrement
             },
             Some('=') => {
                 self.next_char();
-                Token::new(loc, TokenType::MinusEquals)
+                TokenType::MinusEquals
             },
-            _ => Token::new(loc, TokenType::Minus),
+            _ => TokenType::Minus
         }
     }
 
-    fn plus(&mut self, loc: Location) -> Token {
+    fn plus(&mut self) -> TokenType {
         self.skip();
         match self.peek() {
             Some('+') => {
                 self.next_char();
-                Token::new(loc, TokenType::Increment)
+                TokenType::Increment
             },
             Some('=') => {
                 self.next_char();
-                Token::new(loc, TokenType::PlusEquals)
+                TokenType::PlusEquals
             },
-            _ => Token::new(loc, TokenType::Plus),
+            _ => TokenType::Plus
         }
     }
 
-    fn gt(&mut self, loc: Location) -> Token {
+    fn gt(&mut self) -> TokenType {
         self.skip();
         match self.peek() {
             Some('=') => {
                 self.next_char();
-                Token::new(loc, TokenType::GreaterThanEqualTo)
+                TokenType::GreaterThanEqualTo
             },
             Some('>') => {
                 self.next_char();
                 match self.peek() {
                     Some('=') => {
                         self.skip();
-                        Token::new(loc, TokenType::RightShiftEquals)
+                        TokenType::RightShiftEquals
                     },
                     Some('>') => {
                         self.skip();
                         match self.peek() {
                             Some('=') => {
                                 self.skip();
-                                Token::new(loc, TokenType::TripleRightShiftEquals)
+                                TokenType::TripleRightShiftEquals
                             },
-                            _ => Token::new(loc, TokenType::TripleRightShift)
+                            _ => TokenType::TripleRightShift
                         }
                     },
-                    _ => Token::new(loc, TokenType::RightShift)
+                    _ => TokenType::RightShift
                 }
             },
-            _ => Token::new(loc, TokenType::GreaterThan)
+            _ => TokenType::GreaterThan
         }
     }
 
-    fn lt(&mut self, loc: Location) -> Token {
+    fn lt(&mut self) -> TokenType {
         self.skip();
         match self.peek() {
             Some('<') => {
@@ -315,16 +315,16 @@ where I: Iterator<Item = char>,
                 match self.peek() {
                     Some('=') => {
                         self.next_char();
-                        Token::new(loc, TokenType::LeftShiftEquals)
+                        TokenType::LeftShiftEquals
                     },
-                    _ => Token::new(loc, TokenType::LeftShift)
+                    _ => TokenType::LeftShift
                 }
             },
             Some('=') => {
                 self.next_char();
-                Token::new(loc, TokenType::LessThanEqualTo)
+                TokenType::LessThanEqualTo
             },
-            _ => Token::new(loc, TokenType::LessThan)
+            _ => TokenType::LessThan
         }
     }
 
@@ -343,14 +343,14 @@ where I: Iterator<Item = char>,
         }
     }
 
-    fn percent(&mut self, loc: Location) -> Token {
+    fn percent(&mut self) -> TokenType {
         self.skip();
         match self.peek() {
             Some('=') => {
                 self.next_char();
-                Token::new(loc, TokenType::PercentEquals)
+                TokenType::PercentEquals
             },
-            _ => Token::new(loc, TokenType::Percent)
+            _ => TokenType::Percent
         }
     }
 
@@ -409,23 +409,23 @@ where I: Iterator<Item = char>
                 '"'  => self.string(QuoteStyle::Double).map(|x| Token::new(loc, x)),
                 '{'  => self.scalar(loc, TokenType::LeftBrace),
                 '}'  => self.scalar(loc, TokenType::RightBrace),
-                '='  => Ok(self.equal(loc)),
-                '!'  => Ok(self.bang(loc)),
-                '&'  => Ok(self.ampersand(loc)),
-                '|'  => Ok(self.pipe(loc)),
-                '^'  => Ok(self.caret(loc)),
+                '='  => Ok(Token::new(loc, self.equal())),
+                '!'  => Ok(Token::new(loc, self.bang())),
+                '&'  => Ok(Token::new(loc, self.ampersand())),
+                '|'  => Ok(Token::new(loc, self.pipe())),
+                '^'  => Ok(Token::new(loc, self.caret())),
                 '('  => self.scalar(loc, TokenType::LeftParen),
                 ')'  => self.scalar(loc, TokenType::RightParen),
                 ']'  => self.scalar(loc, TokenType::RightBracket),
                 '['  => self.scalar(loc, TokenType::LeftBracket),
                 ':'  => self.scalar(loc, TokenType::Colon),
                 ','  => self.scalar(loc, TokenType::Comma),
-                '+'  => Ok(self.plus(loc)),
-                '-'  => Ok(self.minus(loc)),
-                '>'  => Ok(self.gt(loc)),
-                '<'  => Ok(self.lt(loc)),
+                '+'  => Ok(Token::new(loc, self.plus())),
+                '-'  => Ok(Token::new(loc, self.minus())),
+                '>'  => Ok(Token::new(loc, self.gt())),
+                '<'  => Ok(Token::new(loc, self.lt())),
                 '.'  => self.period(loc),
-                '%'  => Ok(self.percent(loc)),
+                '%'  => Ok(Token::new(loc, self.percent())),
                 '*'  => Ok(Token::new(loc, self.asterisk())),
                 '~'  => self.scalar(loc, TokenType::Tilde),
                 ';'  => self.scalar(loc, TokenType::Semicolon),
