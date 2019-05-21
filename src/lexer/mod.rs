@@ -6,7 +6,7 @@ mod token;
 use self::location::Location;
 use self::token::{CommentStyle,QuoteStyle,Token,TokenType};
 
-struct Lexer<I>
+pub struct Lexer<I>
 where I: Iterator<Item = char>,
 {
     column: u32,
@@ -15,7 +15,7 @@ where I: Iterator<Item = char>,
 }
 
 #[derive(Debug)]
-enum LexError {
+pub enum LexError {
     UnexpectedEndOfInput(Location),
     UnexpectedCharacter(Location),
 }
@@ -23,7 +23,7 @@ enum LexError {
 impl<I> Lexer<I>
 where I: Iterator<Item = char>,
 {
-    fn new(stream: I) -> Lexer<I> {
+    pub fn new(stream: I) -> Lexer<I> {
         Lexer {
             column: 1,
             line: 1,
@@ -55,7 +55,7 @@ where I: Iterator<Item = char>,
     }
 
     fn skip(&mut self) {
-        self.stream.next();
+        self.next_char();
     }
 
     fn scalar(&mut self, loc: Location, typ: TokenType) -> Token {

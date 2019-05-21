@@ -1,7 +1,7 @@
 use std::fmt;
 use super::location::Location;
 
-#[derive(PartialEq)]
+#[derive(PartialEq,Debug)]
 pub enum QuoteStyle {
     Single,
     Double,
@@ -16,17 +16,20 @@ impl fmt::Display for QuoteStyle {
     }
 }
 
+#[derive(Debug)]
 pub enum CommentStyle {
     SingleLine,
     MultiLine,
 }
 
+#[derive(Debug)]
 pub struct Token {
     pub column: u32,
     pub line: u32,
     pub typ: TokenType,
 }
 
+#[derive(Debug)]
 pub enum TokenType {
     Arrow,
     Bang,
