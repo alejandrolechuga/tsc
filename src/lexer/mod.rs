@@ -133,6 +133,23 @@ where I: Iterator<Item = char>,
         Ok(TokenType::String(s, quote))
     }
 
+    fn digit(&mut self) -> Result<TokenType, LexError> {
+        let mut s = String::new();
+        s.push(self.next_char().unwrap());
+        loop {
+            match self.peek() {
+                Some(c) if is_digit(c) => {
+                    self.skip();
+                    s.push(c);
+                },
+                _ => break
+            }
+        }
+
+        s.shrink_to_fit();
+        Ok(TokenType::Number(s))
+    }
+
     fn slash(&mut self, loc: Location) -> Result<Token, LexError> {
         self.skip();
         match self.peek() {
@@ -394,6 +411,14 @@ fn is_ws(c: char) -> bool {
     }
 }
 
+fn is_digit(c: char) -> bool {
+    match c {
+        '0' | '1' | '2' | '3' | '4' |
+        '5' | '6' | '7' | '8' | '9' => true,
+        _ => false,
+    }
+}
+
 impl<I> Iterator for Lexer<I>
 where I: Iterator<Item = char>
 {
@@ -404,6 +429,7 @@ where I: Iterator<Item = char>
         self.peek().map(|next| {
             match next {
                 x if is_ws(x) => Ok(self.ws(loc)),
+                x if is_digit(x) => self.digit().map(|x| Token::new(loc, x)),
                 '/'  => self.slash(loc),
                 '\'' => self.string(QuoteStyle::Single).map(|x| Token::new(loc, x)),
                 '"'  => self.string(QuoteStyle::Double).map(|x| Token::new(loc, x)),
