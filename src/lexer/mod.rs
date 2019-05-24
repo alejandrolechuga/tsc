@@ -438,10 +438,7 @@ where I: Iterator<Item = char>,
                 }
             },
             Some(c) if is_digit(c) => {
-                match self.decimal() {
-                    Ok(d) => Ok(Token::new(loc, TokenType::Number(d))),
-                    Err(e) => return Err(e),
-                }
+                self.decimal().map(|x| Token::new(loc, TokenType::Number(x)))
             },
             _ => Ok(Token::new(loc, TokenType::Period))
         }
