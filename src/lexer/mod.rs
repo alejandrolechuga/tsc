@@ -54,6 +54,16 @@ where I: Iterator<Item = char>,
         self.next_char();
     }
 
+    fn unexpected_char(&self, c: char) -> LexError {
+        let loc = self.get_location();
+        LexError::UnexpectedCharacter(loc, c)
+    }
+
+    fn unexpected_eof(&self) -> LexError {
+        let loc = self.get_location();
+        LexError::UnexpectedEndOfInput(loc)
+    }
+
     fn scalar(&mut self, loc: Location, typ: TokenType) -> Token {
         self.skip();
         Token::new(loc, typ)
@@ -82,11 +92,11 @@ where I: Iterator<Item = char>,
                                     s.push('*');
                                     s.push(c);
                                 },
-                                None => return Err(LexError::UnexpectedEndOfInput(loc)),
+                                None => return Err(self.unexpected_eof()),
                             }
                         },
                         Some(c) => s.push(c),
-                        None => return Err(LexError::UnexpectedEndOfInput(loc)),
+                        None => return Err(self.unexpected_eof()),
                     }
                 }
             },
@@ -115,7 +125,7 @@ where I: Iterator<Item = char>,
 
         loop {
             match self.next_char() {
-                Some('"') if quote == QuoteStyle::Double => break,
+                Some('"')  if quote == QuoteStyle::Double => break,
                 Some('\'') if quote == QuoteStyle::Single => break,
                 Some('\\') => {
                     match self.escape_or_line_continuation() {
@@ -123,9 +133,9 @@ where I: Iterator<Item = char>,
                         Err(x) => return Err(x),
                     }
                 },
-                Some(c) if is_line_terminator(c) => return Err(LexError::UnexpectedCharacter(self.get_location(), c)),
+                Some(c) if is_line_terminator(c) => return Err(self.unexpected_char(c)),
                 Some(c) => s.push(c),
-                None => return Err(LexError::UnexpectedEndOfInput(self.get_location())),
+                None => return Err(self.unexpected_eof()),
             }
         }
 
@@ -133,9 +143,11 @@ where I: Iterator<Item = char>,
         Ok(TokenType::String(s, quote))
     }
 
+    // matches constructs beginning with a digit, e.g. 0.123 or 10e+42
     fn digit(&mut self) -> Result<TokenType, LexError> {
         let mut s = String::new();
-        s.push(self.next_char().unwrap());
+
+        // integer part
         loop {
             match self.peek() {
                 Some(c) if is_digit(c) => {
@@ -146,28 +158,20 @@ where I: Iterator<Item = char>,
             }
         }
 
-        match self.peek() {
-            Some('.') => {
-                let d = self.decimal();
-                match d {
-                    Ok(d) => {
-                        s.push_str(&d);
-                    },
-                    Err(e) => return Err(e),
-                }
-            },
-            _ => (),
+        // decmal part
+        if let Some('.') = self.peek() {
+            match self.decimal() {
+                Ok(d) => s.push_str(&d),
+                Err(e) => return Err(e),
+            }
         }
 
-        match self.peek() {
-            Some('e') | Some('E') => {
-                let e = self.exponent();
-                match e {
-                    Ok(e) => s.push_str(&e),
-                    Err(e) => return Err(e),
-                }
-            },
-            _ => (),
+        // exponent part
+        if let Some('e') | Some('E') = self.peek() {
+            match self.exponent() {
+                Ok(e)  => s.push_str(&e),
+                Err(e) => return Err(e),
+            }
         }
 
         s.shrink_to_fit();
@@ -182,8 +186,8 @@ where I: Iterator<Item = char>,
                 self.skip();
                 s.push(c);
             },
-            Some(c) => return Err(LexError::UnexpectedCharacter(self.get_location(), c)),
-            None    => return Err(LexError::UnexpectedEndOfInput(self.get_location())),
+            Some(c) => return Err(self.unexpected_char(c)),
+            None    => return Err(self.unexpected_eof()),
         }
 
         loop {
@@ -213,8 +217,8 @@ where I: Iterator<Item = char>,
 
         match self.next_char() {
             Some(d) if is_digit(d) => s.push(d),
-            Some(c) => return Err(LexError::UnexpectedCharacter(self.get_location(), c)),
-            None    => return Err(LexError::UnexpectedEndOfInput(self.get_location())),
+            Some(c) => return Err(self.unexpected_char(c)),
+            None    => return Err(self.unexpected_eof()),
         }
 
         loop {
@@ -260,7 +264,7 @@ where I: Iterator<Item = char>,
             Some(c) if c == '\\' => Ok(format!("\\\\")),
             // Something else
             Some(c) => Ok(format!("\\{}", c)),
-            None => Err(LexError::UnexpectedEndOfInput(self.get_location())),
+            None => Err(self.unexpected_eof()),
         }
     }
 
@@ -433,8 +437,8 @@ where I: Iterator<Item = char>,
                 self.next_char();
                 match self.next_char() {
                     Some('.') => Ok(Token::new(loc, TokenType::Ellipsis)),
-                    Some(c)   => Err(LexError::UnexpectedCharacter(loc, c)),
-                    None      => Err(LexError::UnexpectedEndOfInput(loc)),
+                    Some(c)   => Err(self.unexpected_char(c)),
+                    None      => Err(self.unexpected_eof()),
                 }
             },
             Some(c) if is_digit(c) => {
@@ -448,7 +452,7 @@ where I: Iterator<Item = char>,
         self.skip();
         match self.peek() {
             Some('=') => {
-                self.next_char();
+                self.skip();
                 TokenType::PercentEquals
             },
             _ => TokenType::Percent
@@ -540,7 +544,7 @@ where I: Iterator<Item = char>
                 '~'  => Ok(self.scalar(loc, TokenType::Tilde)),
                 ';'  => Ok(self.scalar(loc, TokenType::Semicolon)),
                 '?'  => Ok(self.scalar(loc, TokenType::Question)),
-                c    => Err(LexError::UnexpectedCharacter(loc, c)),
+                c    => Err(self.unexpected_char(c)),
             }
         })
     }
