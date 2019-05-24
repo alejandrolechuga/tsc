@@ -382,7 +382,7 @@ where I: Iterator<Item = char>,
                 TokenType::GreaterThanEqualTo
             },
             Some('>') => {
-                self.next_char();
+                self.skip();
                 match self.peek() {
                     Some('=') => {
                         self.skip();
