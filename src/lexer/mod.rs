@@ -54,9 +54,9 @@ where I: Iterator<Item = char>,
         self.next_char();
     }
 
-    fn scalar(&mut self, loc: Location, typ: TokenType) -> Result<Token, LexError> {
+    fn scalar(&mut self, loc: Location, typ: TokenType) -> Token {
         self.skip();
-        Ok(Token::new(loc, typ))
+        Token::new(loc, typ)
     }
 
     fn comment(&mut self, loc: Location, style: CommentStyle) -> Result<Token, LexError> {
@@ -236,9 +236,9 @@ where I: Iterator<Item = char>,
         match self.peek() {
             Some('/') => self.comment(loc, CommentStyle::SingleLine),
             Some('*') => self.comment(loc, CommentStyle::MultiLine),
-            Some('=') => self.scalar(loc, TokenType::DivEqual),
+            Some('=') => Ok(self.scalar(loc, TokenType::DivEqual)),
             None |
-            Some(_)   => self.scalar(loc, TokenType::Div),
+            Some(_)   => Ok(self.scalar(loc, TokenType::Div)),
         }
     }
 
@@ -517,19 +517,19 @@ where I: Iterator<Item = char>
                 '/'  => self.slash(loc),
                 '\'' => self.string(QuoteStyle::Single).map(|x| Token::new(loc, x)),
                 '"'  => self.string(QuoteStyle::Double).map(|x| Token::new(loc, x)),
-                '{'  => self.scalar(loc, TokenType::LeftBrace),
-                '}'  => self.scalar(loc, TokenType::RightBrace),
+                '{'  => Ok(self.scalar(loc, TokenType::LeftBrace)),
+                '}'  => Ok(self.scalar(loc, TokenType::RightBrace)),
                 '='  => Ok(Token::new(loc, self.equal())),
                 '!'  => Ok(Token::new(loc, self.bang())),
                 '&'  => Ok(Token::new(loc, self.ampersand())),
                 '|'  => Ok(Token::new(loc, self.pipe())),
                 '^'  => Ok(Token::new(loc, self.caret())),
-                '('  => self.scalar(loc, TokenType::LeftParen),
-                ')'  => self.scalar(loc, TokenType::RightParen),
-                ']'  => self.scalar(loc, TokenType::RightBracket),
-                '['  => self.scalar(loc, TokenType::LeftBracket),
-                ':'  => self.scalar(loc, TokenType::Colon),
-                ','  => self.scalar(loc, TokenType::Comma),
+                '('  => Ok(self.scalar(loc, TokenType::LeftParen)),
+                ')'  => Ok(self.scalar(loc, TokenType::RightParen)),
+                ']'  => Ok(self.scalar(loc, TokenType::RightBracket)),
+                '['  => Ok(self.scalar(loc, TokenType::LeftBracket)),
+                ':'  => Ok(self.scalar(loc, TokenType::Colon)),
+                ','  => Ok(self.scalar(loc, TokenType::Comma)),
                 '+'  => Ok(Token::new(loc, self.plus())),
                 '-'  => Ok(Token::new(loc, self.minus())),
                 '>'  => Ok(Token::new(loc, self.gt())),
@@ -537,9 +537,9 @@ where I: Iterator<Item = char>
                 '.'  => self.period(loc),
                 '%'  => Ok(Token::new(loc, self.percent())),
                 '*'  => Ok(Token::new(loc, self.asterisk())),
-                '~'  => self.scalar(loc, TokenType::Tilde),
-                ';'  => self.scalar(loc, TokenType::Semicolon),
-                '?'  => self.scalar(loc, TokenType::Question),
+                '~'  => Ok(self.scalar(loc, TokenType::Tilde)),
+                ';'  => Ok(self.scalar(loc, TokenType::Semicolon)),
+                '?'  => Ok(self.scalar(loc, TokenType::Question)),
                 c    => Err(LexError::UnexpectedCharacter(loc, c)),
             }
         })
