@@ -146,8 +146,89 @@ where I: Iterator<Item = char>,
             }
         }
 
+        match self.peek() {
+            Some('.') => {
+                let d = self.decimal();
+                match d {
+                    Ok(d) => {
+                        s.push_str(&d);
+                    },
+                    Err(e) => return Err(e),
+                }
+            },
+            _ => (),
+        }
+
+        match self.peek() {
+            Some('e') | Some('E') => {
+                let e = self.exponent();
+                match e {
+                    Ok(e) => s.push_str(&e),
+                    Err(e) => return Err(e),
+                }
+            },
+            _ => (),
+        }
+
         s.shrink_to_fit();
         Ok(TokenType::Number(s))
+    }
+
+    fn decimal(&mut self) -> Result<String, LexError> {
+        self.skip();
+        let mut s = String::new();
+        match self.peek() {
+            Some(c) if is_digit(c) => {
+                self.skip();
+                s.push(c);
+            },
+            Some(c) => return Err(LexError::UnexpectedCharacter(self.get_location(), c)),
+            None    => return Err(LexError::UnexpectedEndOfInput(self.get_location())),
+        }
+
+        loop {
+            match self.peek() {
+                Some(c) if is_digit(c) => {
+                    self.skip();
+                    s.push(c);
+                },
+                _ => break
+            }
+        }
+
+        s.shrink_to_fit();
+        Ok(s)
+    }
+
+    fn exponent(&mut self) -> Result<String, LexError> {
+        self.skip();
+        let mut s = String::new();
+        match self.peek() {
+            Some(c) if c == '+' || c == '-' => {
+                self.skip();
+                s.push(c);
+            },
+            _ => (),
+        }
+
+        match self.next_char() {
+            Some(d) if is_digit(d) => s.push(d),
+            Some(c) => return Err(LexError::UnexpectedCharacter(self.get_location(), c)),
+            None    => return Err(LexError::UnexpectedEndOfInput(self.get_location())),
+        }
+
+        loop {
+            match self.peek() {
+                Some(d) if is_digit(d) => {
+                    self.skip();
+                    s.push(d);
+                },
+                _ => break
+            }
+        }
+
+        s.shrink_to_fit();
+        Ok(s)
     }
 
     fn slash(&mut self, loc: Location) -> Result<Token, LexError> {
@@ -354,6 +435,12 @@ where I: Iterator<Item = char>,
                     Some('.') => Ok(Token::new(loc, TokenType::Ellipsis)),
                     Some(c)   => Err(LexError::UnexpectedCharacter(loc, c)),
                     None      => Err(LexError::UnexpectedEndOfInput(loc)),
+                }
+            },
+            Some(c) if is_digit(c) => {
+                match self.decimal() {
+                    Ok(d) => Ok(Token::new(loc, TokenType::Number(d))),
+                    Err(e) => return Err(e),
                 }
             },
             _ => Ok(Token::new(loc, TokenType::Period))
