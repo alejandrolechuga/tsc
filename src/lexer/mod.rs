@@ -54,6 +54,23 @@ where I: Iterator<Item = char>,
         self.next_char();
     }
 
+    fn push_while<P>(&mut self, s: &mut String, predicate: P)
+    where P: Fn(char) -> bool,
+    {
+        loop {
+            match self.peek() {
+                Some(x) => {
+                    if !predicate(x) {
+                        break
+                    }
+                    s.push(x);
+                    self.skip();
+                },
+                None => break
+            }
+        }
+    }
+
     fn unexpected_char(&self, c: char) -> LexError {
         let loc = self.get_location();
         LexError::UnexpectedCharacter(loc, c)
@@ -73,15 +90,7 @@ where I: Iterator<Item = char>,
         let mut s = String::new();
         self.skip();
         match style {
-            CommentStyle::SingleLine => {
-                loop {
-                    match self.next_char() {
-                        Some(c) if is_line_terminator(c) => break,
-                        Some(c) => s.push(c),
-                        None => break,
-                    }
-                }
-            },
+            CommentStyle::SingleLine => self.push_while(&mut s, is_line_terminator),
             CommentStyle::MultiLine => {
                 loop {
                     match self.next_char() {
@@ -105,16 +114,11 @@ where I: Iterator<Item = char>,
         Ok(Token::new(loc, TokenType::Comment(s, style)))
     }
 
-    fn ws(&mut self, loc: Location) -> Token {
+    fn ws(&mut self) -> TokenType {
         let mut s = String::new();
-        loop {
-            match self.next_char() {
-                Some(c) if is_ws(c) => s.push(c),
-                _ => break
-            }
-        }
+        self.push_while(&mut s, is_ws);
         s.shrink_to_fit();
-        Token::new(loc, TokenType::WhiteSpace(s))
+        TokenType::WhiteSpace(s)
     }
 
     fn string(&mut self, quote: QuoteStyle) -> Result<TokenType, LexError> {
@@ -148,15 +152,7 @@ where I: Iterator<Item = char>,
         let mut s = String::new();
 
         // integer part
-        loop {
-            match self.peek() {
-                Some(c) if is_digit(c) => {
-                    self.skip();
-                    s.push(c);
-                },
-                _ => break
-            }
-        }
+        self.push_while(&mut s, is_digit);
 
         // decmal part
         if let Some('.') = self.peek() {
@@ -190,15 +186,7 @@ where I: Iterator<Item = char>,
             None    => return Err(self.unexpected_eof()),
         }
 
-        loop {
-            match self.peek() {
-                Some(c) if is_digit(c) => {
-                    self.skip();
-                    s.push(c);
-                },
-                _ => break
-            }
-        }
+        self.push_while(&mut s, is_digit);
 
         s.shrink_to_fit();
         Ok(s)
@@ -221,15 +209,7 @@ where I: Iterator<Item = char>,
             None    => return Err(self.unexpected_eof()),
         }
 
-        loop {
-            match self.peek() {
-                Some(d) if is_digit(d) => {
-                    self.skip();
-                    s.push(d);
-                },
-                _ => break
-            }
-        }
+        self.push_while(&mut s, is_digit);
 
         s.shrink_to_fit();
         Ok(s)
@@ -272,14 +252,14 @@ where I: Iterator<Item = char>,
         self.skip();
         match self.peek() {
             Some('>') => {
-                self.next_char();
+                self.skip();
                 TokenType::Arrow
             },
             Some('=') => {
-                self.next_char();
+                self.skip();
                 match self.peek() {
                     Some('=') => {
-                        self.next_char();
+                        self.skip();
                         TokenType::TripleEquals
                     },
                     _ => TokenType::DoubleEquals
@@ -294,10 +274,10 @@ where I: Iterator<Item = char>,
         self.skip();
         match self.peek() {
             Some('=') => {
-                self.next_char();
+                self.skip();
                 match self.peek() {
                     Some('=') => {
-                        self.next_char();
+                        self.skip();
                         TokenType::NotTripleEquals
                     },
                     _ => TokenType::NotEquals
@@ -311,11 +291,11 @@ where I: Iterator<Item = char>,
         self.skip();
         match self.peek() {
             Some('&') => {
-                self.next_char();
+                self.skip();
                 TokenType::LogicalAnd
             },
             Some('=') => {
-                self.next_char();
+                self.skip();
                 TokenType::BinaryAndEquals
             },
             _ => TokenType::BinaryAnd
@@ -326,11 +306,11 @@ where I: Iterator<Item = char>,
         self.skip();
         match self.peek() {
             Some('|') => {
-                self.next_char();
+                self.skip();
                 TokenType::LogicalOr
             },
             Some('=') => {
-                self.next_char();
+                self.skip();
                 TokenType::BinaryOrEquals
             },
             _ => TokenType::BinaryOr
@@ -341,7 +321,7 @@ where I: Iterator<Item = char>,
         self.skip();
         match self.peek() {
             Some('=') => {
-                self.next_char();
+                self.skip();
                 TokenType::BinaryXorEquals
             },
             _ => TokenType::BinaryXor
@@ -352,11 +332,11 @@ where I: Iterator<Item = char>,
         self.skip();
         match self.peek() {
             Some('-') => {
-                self.next_char();
+                self.skip();
                 TokenType::Decrement
             },
             Some('=') => {
-                self.next_char();
+                self.skip();
                 TokenType::MinusEquals
             },
             _ => TokenType::Minus
@@ -367,11 +347,11 @@ where I: Iterator<Item = char>,
         self.skip();
         match self.peek() {
             Some('+') => {
-                self.next_char();
+                self.skip();
                 TokenType::Increment
             },
             Some('=') => {
-                self.next_char();
+                self.skip();
                 TokenType::PlusEquals
             },
             _ => TokenType::Plus
@@ -382,7 +362,7 @@ where I: Iterator<Item = char>,
         self.skip();
         match self.peek() {
             Some('=') => {
-                self.next_char();
+                self.skip();
                 TokenType::GreaterThanEqualTo
             },
             Some('>') => {
@@ -413,17 +393,17 @@ where I: Iterator<Item = char>,
         self.skip();
         match self.peek() {
             Some('<') => {
-                self.next_char();
+                self.skip();
                 match self.peek() {
                     Some('=') => {
-                        self.next_char();
+                        self.skip();
                         TokenType::LeftShiftEquals
                     },
                     _ => TokenType::LeftShift
                 }
             },
             Some('=') => {
-                self.next_char();
+                self.skip();
                 TokenType::LessThanEqualTo
             },
             _ => TokenType::LessThan
@@ -434,7 +414,7 @@ where I: Iterator<Item = char>,
         self.skip();
         match self.peek() {
             Some('.') => {
-                self.next_char();
+                self.skip();
                 match self.next_char() {
                     Some('.') => Ok(Token::new(loc, TokenType::Ellipsis)),
                     Some(c)   => Err(self.unexpected_char(c)),
@@ -463,17 +443,17 @@ where I: Iterator<Item = char>,
         self.skip();
         match self.peek() {
             Some('*') => {
-                self.next_char();
+                self.skip();
                 match self.peek() {
                     Some('=') => {
-                        self.next_char();
+                        self.skip();
                         TokenType::PowerEquals
                     },
                     _ => TokenType::Power
                 }
             },
             Some('=') => {
-                self.next_char();
+                self.skip();
                 TokenType::TimesEquals
             },
             _ => TokenType::Times
@@ -516,7 +496,7 @@ where I: Iterator<Item = char>
         let loc = self.get_location();
         self.peek().map(|next| {
             match next {
-                x if is_ws(x) => Ok(self.ws(loc)),
+                x if is_ws(x) => Ok(Token::new(loc, self.ws())),
                 x if is_digit(x) => self.digit().map(|x| Token::new(loc, x)),
                 '/'  => self.slash(loc),
                 '\'' => self.string(QuoteStyle::Single).map(|x| Token::new(loc, x)),
