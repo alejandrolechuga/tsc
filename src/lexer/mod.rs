@@ -54,6 +54,16 @@ where I: Iterator<Item = char>,
         self.next_char();
     }
 
+    fn skip_if(&mut self, c: char) -> bool {
+        match self.peek() {
+            Some(x) if c == x => {
+                self.skip();
+                true
+            },
+            _ => false,
+        }
+    }
+
     fn push_while<P>(&mut self, s: &mut String, predicate: P)
     where P: Fn(char) -> bool,
     {
@@ -249,164 +259,118 @@ where I: Iterator<Item = char>,
     }
 
     fn equal(&mut self) -> TokenType {
-        self.skip();
-        match self.peek() {
-            Some('>') => {
-                self.skip();
-                TokenType::Arrow
-            },
-            Some('=') => {
-                self.skip();
-                match self.peek() {
-                    Some('=') => {
-                        self.skip();
-                        TokenType::TripleEquals
-                    },
-                    _ => TokenType::DoubleEquals
-                }
-            },
-            Some(_) |
-            None => TokenType::Equals
+        if self.skip_if('>') {
+            TokenType::Arrow
+        } else if self.skip_if('=') {
+            if self.skip_if('=') {
+                TokenType::TripleEquals
+            } else {
+                TokenType::DoubleEquals
+            }
+        } else {
+            TokenType::Equals
         }
     }
 
     fn bang(&mut self) -> TokenType {
         self.skip();
-        match self.peek() {
-            Some('=') => {
-                self.skip();
-                match self.peek() {
-                    Some('=') => {
-                        self.skip();
-                        TokenType::NotTripleEquals
-                    },
-                    _ => TokenType::NotEquals
-                }
-            },
-            _ => TokenType::Bang
+        if self.skip_if('=') {
+            if self.skip_if('=') {
+                TokenType::NotTripleEquals
+            } else {
+                TokenType::NotEquals
+            }
+        } else {
+            TokenType::Bang
         }
     }
 
     fn ampersand(&mut self) -> TokenType {
         self.skip();
-        match self.peek() {
-            Some('&') => {
-                self.skip();
-                TokenType::LogicalAnd
-            },
-            Some('=') => {
-                self.skip();
-                TokenType::BinaryAndEquals
-            },
-            _ => TokenType::BinaryAnd
+        if self.skip_if('&') {
+            TokenType::LogicalAnd
+        } else if self.skip_if('=') {
+            TokenType::BinaryAndEquals
+        } else {
+            TokenType::BinaryAnd
         }
     }
 
     fn pipe(&mut self) -> TokenType {
         self.skip();
-        match self.peek() {
-            Some('|') => {
-                self.skip();
-                TokenType::LogicalOr
-            },
-            Some('=') => {
-                self.skip();
-                TokenType::BinaryOrEquals
-            },
-            _ => TokenType::BinaryOr
+        if self.skip_if('|') {
+            TokenType::LogicalOr
+        } else if self.skip_if('=') {
+            TokenType::BinaryOrEquals
+        } else {
+            TokenType::BinaryOr
         }
     }
 
     fn caret(&mut self) -> TokenType {
         self.skip();
-        match self.peek() {
-            Some('=') => {
-                self.skip();
-                TokenType::BinaryXorEquals
-            },
-            _ => TokenType::BinaryXor
+        if self.skip_if('=') {
+            TokenType::BinaryXorEquals
+        } else {
+            TokenType::BinaryXor
         }
     }
 
     fn minus(&mut self) -> TokenType {
         self.skip();
-        match self.peek() {
-            Some('-') => {
-                self.skip();
-                TokenType::Decrement
-            },
-            Some('=') => {
-                self.skip();
-                TokenType::MinusEquals
-            },
-            _ => TokenType::Minus
+        if self.skip_if('-') {
+            TokenType::Decrement
+        } else if self.skip_if('=') {
+            TokenType::MinusEquals
+        } else {
+            TokenType::Minus
         }
     }
 
     fn plus(&mut self) -> TokenType {
         self.skip();
-        match self.peek() {
-            Some('+') => {
-                self.skip();
-                TokenType::Increment
-            },
-            Some('=') => {
-                self.skip();
-                TokenType::PlusEquals
-            },
-            _ => TokenType::Plus
+        if self.skip_if('+') {
+            TokenType::Increment
+        } else if self.skip_if('=') {
+            TokenType::PlusEquals
+        } else {
+            TokenType::Plus
         }
     }
 
     fn gt(&mut self) -> TokenType {
         self.skip();
-        match self.peek() {
-            Some('=') => {
-                self.skip();
-                TokenType::GreaterThanEqualTo
-            },
-            Some('>') => {
-                self.skip();
-                match self.peek() {
-                    Some('=') => {
-                        self.skip();
-                        TokenType::RightShiftEquals
-                    },
-                    Some('>') => {
-                        self.skip();
-                        match self.peek() {
-                            Some('=') => {
-                                self.skip();
-                                TokenType::TripleRightShiftEquals
-                            },
-                            _ => TokenType::TripleRightShift
-                        }
-                    },
-                    _ => TokenType::RightShift
+
+        if self.skip_if('=') {
+            TokenType::GreaterThanEqualTo
+        } else if self.skip_if('>') {
+            if self.skip_if('>') {
+                if self.skip_if('=') {
+                    TokenType::TripleRightShiftEquals
+                } else {
+                    TokenType::TripleRightShift
                 }
-            },
-            _ => TokenType::GreaterThan
+            } else if self.skip_if('=') {
+                TokenType::RightShiftEquals
+            } else {
+                TokenType::RightShift
+            }
+        } else {
+            TokenType::GreaterThan
         }
     }
 
     fn lt(&mut self) -> TokenType {
-        self.skip();
-        match self.peek() {
-            Some('<') => {
-                self.skip();
-                match self.peek() {
-                    Some('=') => {
-                        self.skip();
-                        TokenType::LeftShiftEquals
-                    },
-                    _ => TokenType::LeftShift
-                }
-            },
-            Some('=') => {
-                self.skip();
-                TokenType::LessThanEqualTo
-            },
-            _ => TokenType::LessThan
+        if self.skip_if('<') {
+            if self.skip_if('=') {
+                TokenType::LeftShiftEquals
+            } else {
+                TokenType::LeftShift
+            }
+        } else if self.skip_if('=') {
+            TokenType::LessThanEqualTo
+        } else {
+            TokenType::LessThan
         }
     }
 
@@ -429,34 +393,24 @@ where I: Iterator<Item = char>,
     }
 
     fn percent(&mut self) -> TokenType {
-        self.skip();
-        match self.peek() {
-            Some('=') => {
-                self.skip();
-                TokenType::PercentEquals
-            },
-            _ => TokenType::Percent
+        if self.skip_if('=') {
+            TokenType::PercentEquals
+        } else {
+            TokenType::Percent
         }
     }
 
     fn asterisk(&mut self) -> TokenType {
-        self.skip();
-        match self.peek() {
-            Some('*') => {
-                self.skip();
-                match self.peek() {
-                    Some('=') => {
-                        self.skip();
-                        TokenType::PowerEquals
-                    },
-                    _ => TokenType::Power
-                }
-            },
-            Some('=') => {
-                self.skip();
-                TokenType::TimesEquals
-            },
-            _ => TokenType::Times
+        if self.skip_if('*') {
+            if self.skip_if('=') {
+                TokenType::PowerEquals
+            } else {
+                TokenType::Power
+            }
+        } else if self.skip_if('=') {
+            TokenType::TimesEquals
+        } else {
+            TokenType::Times
         }
     }
 }
