@@ -415,8 +415,64 @@ where I: Iterator<Item = char>,
         }
     }
 
-    fn identifier(&mut self) -> Result<Token, LexError> {
-        Err(self.unexpected_eof())
+    fn identifier(&mut self, loc: Location) -> Result<Token, LexError> {
+        let mut s = String::new();
+
+        loop {
+            match self.peek() {
+                Some('\\') => {
+                    match self.unicode_escape() {
+                        Ok(x)  => s.push_str(&x),
+                        Err(e) => return Err(e),
+                    }
+                },
+                Some(c) if is_id_continue(c) => {
+                    self.skip();
+                    s.push(c);
+                },
+                Some(_) |
+                None => break
+            }
+        }
+
+        s.shrink_to_fit();
+        Ok(Token::new(loc, TokenType::Identifier(s)))
+    }
+
+    fn unicode_escape(&mut self) -> Result<String, LexError> {
+        let mut s = String::with_capacity(6);
+
+        // "\"
+        self.skip();
+
+        // "u"
+        match self.peek() {
+            Some('u') => self.skip(),
+            Some(c)   => return Err(self.unexpected_char(c)),
+            None      => return Err(self.unexpected_eof()),
+        }
+
+        match self.peek() {
+            Some('{') => {
+                // {CodePoint}
+            },
+            _ => {
+                // Hex4Digits
+                for i in 0..4 {
+                    match self.peek() {
+                        Some(c) if c.is_ascii_hexdigit() => {
+                            self.skip();
+                            s.push(c);
+                        },
+                        Some(c) => return Err(self.unexpected_char(c)),
+                        None    => return Err(self.unexpected_eof()),
+                    }
+                }
+            }
+        }
+
+        s.shrink_to_fit();
+        Ok(s)
     }
 }
 
@@ -447,7 +503,12 @@ fn is_digit(c: char) -> bool {
 }
 
 fn is_id_start(c: char) -> bool {
-    let re = Regex::new(r"\p{ID_Start}").unwrap();
+    let re = Regex::new(r"\p{ID_Start}|\$|_|\\").unwrap();
+    re.is_match(&format!("{}", c))
+}
+
+fn is_id_continue(c: char) -> bool {
+    let re = Regex::new(r"\p{ID_Continue}|\$|\\|ZWNJ|ZWJ").unwrap();
     re.is_match(&format!("{}", c))
 }
 
@@ -462,7 +523,7 @@ where I: Iterator<Item = char>
             match next {
                 x if is_ws(x) => Ok(Token::new(loc, self.ws())),
                 x if is_digit(x) => self.digit().map(|x| Token::new(loc, x)),
-                x if is_id_start(x) => self.identifier(),
+                x if is_id_start(x) => self.identifier(loc),
                 '/'  => self.slash(loc),
                 '\'' => self.string(QuoteStyle::Single).map(|x| Token::new(loc, x)),
                 '"'  => self.string(QuoteStyle::Double).map(|x| Token::new(loc, x)),
