@@ -1,4 +1,5 @@
 use std::iter::Peekable;
+use regex::Regex;
 
 mod lexerror;
 mod location;
@@ -413,6 +414,10 @@ where I: Iterator<Item = char>,
             TokenType::Times
         }
     }
+
+    fn identifier(&mut self) -> Result<Token, LexError> {
+        Err(self.unexpected_eof())
+    }
 }
 
 fn is_line_terminator(c: char) -> bool {
@@ -441,6 +446,11 @@ fn is_digit(c: char) -> bool {
     }
 }
 
+fn is_id_start(c: char) -> bool {
+    let re = Regex::new(r"\p{ID_Start}").unwrap();
+    re.is_match(&format!("{}", c))
+}
+
 impl<I> Iterator for Lexer<I>
 where I: Iterator<Item = char>
 {
@@ -452,6 +462,7 @@ where I: Iterator<Item = char>
             match next {
                 x if is_ws(x) => Ok(Token::new(loc, self.ws())),
                 x if is_digit(x) => self.digit().map(|x| Token::new(loc, x)),
+                x if is_id_start(x) => self.identifier(),
                 '/'  => self.slash(loc),
                 '\'' => self.string(QuoteStyle::Single).map(|x| Token::new(loc, x)),
                 '"'  => self.string(QuoteStyle::Double).map(|x| Token::new(loc, x)),
