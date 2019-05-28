@@ -1,5 +1,7 @@
+extern crate unicode;
+
 use std::iter::Peekable;
-use regex::Regex;
+use unicode::{is,UnicodeProperty};
 
 mod lexerror;
 mod location;
@@ -458,7 +460,7 @@ where I: Iterator<Item = char>,
             },
             _ => {
                 // Hex4Digits
-                for i in 0..4 {
+                for _i in 0..4 {
                     match self.peek() {
                         Some(c) if c.is_ascii_hexdigit() => {
                             self.skip();
@@ -503,13 +505,24 @@ fn is_digit(c: char) -> bool {
 }
 
 fn is_id_start(c: char) -> bool {
-    let re = Regex::new(r"\p{ID_Start}|\$|_|\\").unwrap();
-    re.is_match(&format!("{}", c))
+    match c {
+        c if is(c, UnicodeProperty::IdStart) => true,
+        '\\' => true,
+        '$'  => true,
+        '_'  => true,
+        _    => false,
+    }
 }
 
 fn is_id_continue(c: char) -> bool {
-    let re = Regex::new(r"\p{ID_Continue}|\$|\\|ZWNJ|ZWJ").unwrap();
-    re.is_match(&format!("{}", c))
+    match c {
+        c if is(c, UnicodeProperty::IdContinue) => true,
+        '\\'       => true,
+        '$'        => true,
+        '\u{200C}' => true, // ZWNJ
+        '\u{200D}' => true, // ZWJ
+        _          => false,
+    }
 }
 
 impl<I> Iterator for Lexer<I>
