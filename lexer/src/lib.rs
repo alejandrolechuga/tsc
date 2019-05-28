@@ -420,6 +420,23 @@ where I: Iterator<Item = char>,
     fn identifier(&mut self, loc: Location) -> Result<Token, LexError> {
         let mut s = String::new();
 
+        // Head char
+        match self.peek() {
+            Some('\\') => {
+                match self.unicode_escape() {
+                    Ok(x)  => s.push_str(&x),
+                    Err(e) => return Err(e),
+                }
+            },
+            Some(c) if is_id_start(c) => {
+                self.skip();
+                s.push(c);
+            },
+            Some(c) => return Err(self.unexpected_char(c)),
+            None    => return Err(self.unexpected_eof()),
+        }
+
+        // Tail chars
         loop {
             match self.peek() {
                 Some('\\') => {
@@ -445,11 +462,15 @@ where I: Iterator<Item = char>,
         let mut s = String::with_capacity(6);
 
         // "\"
+        s.push('\\');
         self.skip();
 
         // "u"
         match self.peek() {
-            Some('u') => self.skip(),
+            Some('u') => {
+                s.push('u');
+                self.skip()
+            },
             Some(c)   => return Err(self.unexpected_char(c)),
             None      => return Err(self.unexpected_eof()),
         }
@@ -457,6 +478,38 @@ where I: Iterator<Item = char>,
         match self.peek() {
             Some('{') => {
                 // {CodePoint}
+                s.push('{');
+
+                // code point hex chars
+                let mut cp = String::with_capacity(5);
+                loop {
+                    match self.peek() {
+                        Some(c) if c.is_ascii_hexdigit() => {
+                            cp.push(c);
+                            s.push(c);
+                        },
+                        _ => break
+                    }
+                }
+                // code point must be <= 0x10FFFF
+                match cp.parse::<u32>() {
+                    Ok(x) => {
+                        if x > 0x10FFFF {
+                            return Err(LexError::InvalidCodePoint(cp))
+                        }
+                    },
+                    Err(_) => return Err(LexError::InvalidCodePoint(cp))
+                }
+
+                // Closing brace
+                match self.peek() {
+                    Some('}') => {
+                        s.push('}');
+                        self.skip();
+                    },
+                    Some(c) => return Err(self.unexpected_char(c)),
+                    None    => return Err(self.unexpected_eof()),
+                }
             },
             _ => {
                 // Hex4Digits
