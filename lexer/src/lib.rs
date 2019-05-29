@@ -241,7 +241,7 @@ where I: Iterator<Item = char>,
 
     fn escape_or_line_continuation(&mut self) -> Result<String, LexError> {
         match self.next_char() {
-            // line continuation
+            // Line continuation
             Some(c) if is_line_terminator(c) => {
                 if c == '\u{000D}' && self.peek() == Some('\u{000A}') {
                     self.skip();
@@ -251,11 +251,15 @@ where I: Iterator<Item = char>,
                     Ok(format!("\\{}", c))
                 }
             },
-            // Quote
-            Some(c) if c == '"' || c == '\'' => Ok(format!("\\{}", c)),
-            // Backslash
+            // CharacterEscapeSequence
+            Some(c) if is_escapable_char(c) => Ok(format!("\\{}", c)),
+            // 0
+            Some('0') => {
+                Err(self.unexpected_eof())
+            },
+            // HexEscapeSequence
             Some(c) if c == '\\' => Ok(format!("\\\\")),
-            // Something else
+            // UnicodeEscapeSequence
             Some(c) => Ok(format!("\\{}", c)),
             None => Err(self.unexpected_eof()),
         }
@@ -578,6 +582,14 @@ fn is_id_continue(c: char) -> bool {
     }
 }
 
+fn is_escapable_char(c: char) -> bool {
+    match c {
+        '\'' | '"' | '\\' | 'b' | 'f' |
+        'n'  | 'r' | 't'  | 'v' => true,
+        _ => false,
+    }
+}
+
 impl<I> Iterator for Lexer<I>
 where I: Iterator<Item = char>
 {
@@ -587,8 +599,8 @@ where I: Iterator<Item = char>
         let loc = self.get_location();
         self.peek().map(|next| {
             match next {
-                x if is_ws(x) => Ok(Token::new(loc, self.ws())),
-                x if is_digit(x) => self.digit().map(|x| Token::new(loc, x)),
+                x if is_ws(x)       => Ok(Token::new(loc, self.ws())),
+                x if is_digit(x)    => self.digit().map(|x| Token::new(loc, x)),
                 x if is_id_start(x) => self.identifier(loc),
                 '/'  => self.slash(loc),
                 '\'' => self.string(QuoteStyle::Single).map(|x| Token::new(loc, x)),
