@@ -258,7 +258,31 @@ where I: Iterator<Item = char>,
                 Err(self.unexpected_eof())
             },
             // HexEscapeSequence
-            Some(c) if c == '\\' => Ok(format!("\\\\")),
+            Some('x') => {
+
+                let mut s = String::with_capacity(4);
+                s.push('\\');
+                s.push('x');
+                self.skip();
+
+                match self.peek() {
+                    Some(c) if c.is_ascii_hexdigit() => {
+                        s.push(c);
+                        self.skip();
+                        match self.peek() {
+                            Some(c) if c.is_ascii_hexdigit() => {
+                                self.skip();
+                                s.push(c);
+                                Ok(s)
+                            },
+                            Some(c) => Err(self.unexpected_char(c)),
+                            None    => Err(self.unexpected_eof()),
+                        }
+                    },
+                    Some(x) => Err(self.unexpected_char(x)),
+                    None    => Err(self.unexpected_eof()),
+                }
+            },
             // UnicodeEscapeSequence
             Some(c) => Ok(format!("\\{}", c)),
             None => Err(self.unexpected_eof()),
