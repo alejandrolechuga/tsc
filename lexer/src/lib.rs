@@ -266,11 +266,14 @@ where I: Iterator<Item = char>,
             Some(c) if is_escapable_char(c) => Ok(format!("\\{}", c)),
             // 0
             Some('0') => {
-                Err(self.unexpected_eof())
+                self.skip();
+                match self.peek() {
+                    Some(c) if is_digit(c) => Err(self.unexpected_char(c)),
+                    _ => Ok("\\0".to_string()),
+                }
             },
             // HexEscapeSequence
             Some('x') => {
-
                 let mut s = String::with_capacity(4);
                 s.push('\\');
                 s.push('x');
@@ -295,8 +298,10 @@ where I: Iterator<Item = char>,
                 }
             },
             // UnicodeEscapeSequence
-            Some(c) => Ok(format!("\\{}", c)),
-            None => Err(self.unexpected_eof()),
+            Some('u') => self.unicode_escape(),
+            // Something else; invalid
+            Some(c) => Err(self.unexpected_char(c)),
+            None    => Err(self.unexpected_eof()),
         }
     }
 
