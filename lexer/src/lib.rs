@@ -163,11 +163,22 @@ where I: Iterator<Item = char>,
     // matches constructs beginning with a digit, e.g. 0.123 or 10e+42
     fn digit(&mut self) -> Result<TokenType, LexError> {
         let mut s = String::new();
+        // is digit 0
+        // is the next thing x
+        // next thing should hex digits
+        match self.peek() {
+            Some(c) if c == 'x'|| c == 'X' => {
+                s.push(c);
+                return Ok(TokenType::Number(s));
+            },
+            None => return Err(self.unexpected_eof()),
+            Some(_) => ()
+        }
 
         // integer part
         self.push_while(&mut s, is_digit);
 
-        // decmal part
+        // decimal part
         if let Some('.') = self.peek() {
             match self.decimal() {
                 Ok(d) => s.push_str(&d),
