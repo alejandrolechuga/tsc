@@ -176,7 +176,7 @@ where I: Iterator<Item = char>,
         }
 
         // integer part
-        self.push_while(&mut s, is_digit);
+        self.push_while(&mut s, |c| c.is_ascii_digit());
 
         // decimal part
         if let Some('.') = self.peek() {
@@ -202,7 +202,7 @@ where I: Iterator<Item = char>,
         self.skip();
         let mut s = String::new();
         match self.peek() {
-            Some(c) if is_digit(c) => {
+            Some(c) if c.is_ascii_digit() => {
                 self.skip();
                 s.push(c);
             },
@@ -210,7 +210,7 @@ where I: Iterator<Item = char>,
             None    => return Err(self.unexpected_eof()),
         }
 
-        self.push_while(&mut s, is_digit);
+        self.push_while(&mut s, |c| c.is_ascii_digit());
 
         s.shrink_to_fit();
         Ok(s)
@@ -228,12 +228,12 @@ where I: Iterator<Item = char>,
         }
 
         match self.next_char() {
-            Some(d) if is_digit(d) => s.push(d),
+            Some(d) if d.is_ascii_digit() => s.push(d),
             Some(c) => return Err(self.unexpected_char(c)),
             None    => return Err(self.unexpected_eof()),
         }
 
-        self.push_while(&mut s, is_digit);
+        self.push_while(&mut s, |d| d.is_ascii_digit());
 
         s.shrink_to_fit();
         Ok(s)
@@ -268,7 +268,7 @@ where I: Iterator<Item = char>,
             Some('0') => {
                 self.skip();
                 match self.peek() {
-                    Some(c) if is_digit(c) => Err(self.unexpected_char(c)),
+                    Some(c) if c.is_ascii_digit() => Err(self.unexpected_char(c)),
                     _ => Ok("\\0".to_string()),
                 }
             },
@@ -309,31 +309,48 @@ where I: Iterator<Item = char>,
         let mut s = String::new();
         self.skip();
         loop {
-            match self.next_char() {
+            match self.peek() {
                 Some('$') => {
+                    self.skip();
                     s.push('$');
                     match self.peek() {
                         Some('{') => {
                             s.push('{');
                             self.skip();
-                            match self.peek() {
-                                Some('`') => {
-                                    s.push('`');
-                                    break
-                                },
-                                Some(c) => return Err(self.unexpected_char(c)),
-                                None    => return Err(self.unexpected_eof()),
-                            }
+                            break;
                         },
-                        Some(_) => continue,
+                        Some(c) => {
+                            self.skip();
+                            s.push(c);
+                        },
                         None => return Err(self.unexpected_eof()),
                     }
                 },
                 Some('\\') => {
+                    self.skip();
+                    s.push('\\');
+                    match self.next_char() {
+                        Some(c) if c.is_ascii_digit() => {
+
+                        },
+                        Some(c) if is_line_terminator(c) => {
+
+                        },
+                        Some('x') => {
+
+                        },
+                        Some('u') => {
+
+                        },
+                        Some(c) => return Err(self.unexpected_char(c)),
+                        None    => return Err(self.unexpected_eof()),
+                    }
                     // EscapeSequence|NotEscapeSequence|LineContinuation
                 },
                 Some('`') => {
-                    return Err(self.unexpected_char('`'))
+                    self.skip();
+                    s.push('`');
+                    break;
                 },
                 Some(c) => {
                     s.push(c);
@@ -473,7 +490,7 @@ where I: Iterator<Item = char>,
                     None      => Err(self.unexpected_eof()),
                 }
             },
-            Some(c) if is_digit(c) => {
+            Some(c) if c.is_ascii_digit() => {
                 self.decimal().map(|x| Token::new(loc, TokenType::Number(x)))
             },
             _ => Ok(Token::new(loc, TokenType::Period))
@@ -634,14 +651,6 @@ fn is_ws(c: char) -> bool {
     }
 }
 
-fn is_digit(c: char) -> bool {
-    match c {
-        '0' | '1' | '2' | '3' | '4' |
-        '5' | '6' | '7' | '8' | '9' => true,
-        _ => false,
-    }
-}
-
 fn is_id_start(c: char) -> bool {
     match c {
         c if is(c, UnicodeProperty::IdStart) => true,
@@ -680,9 +689,9 @@ where I: Iterator<Item = char>
         let loc = self.get_location();
         self.peek().map(|next| {
             match next {
-                x if is_ws(x)       => Ok(Token::new(loc, self.ws())),
-                x if is_digit(x)    => self.digit().map(|x| Token::new(loc, x)),
-                x if is_id_start(x) => self.identifier(loc),
+                x if is_ws(x)           => Ok(Token::new(loc, self.ws())),
+                x if x.is_ascii_digit() => self.digit().map(|x| Token::new(loc, x)),
+                x if is_id_start(x)     => self.identifier(loc),
                 '`'  => self.template(loc),
                 '/'  => self.slash(loc),
                 '\'' => self.string(QuoteStyle::Single).map(|x| Token::new(loc, x)),
