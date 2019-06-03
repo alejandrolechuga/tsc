@@ -305,6 +305,47 @@ where I: Iterator<Item = char>,
         }
     }
 
+    fn template(&mut self, loc: Location) -> Result<Token, LexError> {
+        let mut s = String::new();
+        self.skip();
+        loop {
+            match self.next_char() {
+                Some('$') => {
+                    s.push('$');
+                    match self.peek() {
+                        Some('{') => {
+                            s.push('{');
+                            self.skip();
+                            match self.peek() {
+                                Some('`') => {
+                                    s.push('`');
+                                    break
+                                },
+                                Some(c) => return Err(self.unexpected_char(c)),
+                                None    => return Err(self.unexpected_eof()),
+                            }
+                        },
+                        Some(_) => continue,
+                        None => return Err(self.unexpected_eof()),
+                    }
+                },
+                Some('\\') => {
+                    // EscapeSequence|NotEscapeSequence|LineContinuation
+                },
+                Some('`') => {
+                    return Err(self.unexpected_char('`'))
+                },
+                Some(c) => {
+                    s.push(c);
+                }
+                None => return Err(self.unexpected_eof()),
+            }
+        }
+
+        s.shrink_to_fit();
+        Ok(Token::new(loc, TokenType::Template(s)))
+    }
+
     fn equal(&mut self) -> TokenType {
         if self.skip_if('>') {
             TokenType::Arrow
@@ -642,6 +683,7 @@ where I: Iterator<Item = char>
                 x if is_ws(x)       => Ok(Token::new(loc, self.ws())),
                 x if is_digit(x)    => self.digit().map(|x| Token::new(loc, x)),
                 x if is_id_start(x) => self.identifier(loc),
+                '`'  => self.template(loc),
                 '/'  => self.slash(loc),
                 '\'' => self.string(QuoteStyle::Single).map(|x| Token::new(loc, x)),
                 '"'  => self.string(QuoteStyle::Double).map(|x| Token::new(loc, x)),
