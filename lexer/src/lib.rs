@@ -689,12 +689,13 @@ fn is_id_continue(c: char) -> bool {
     }
 }
 
-// TODO NonEscapeCharacter
 fn is_escapable_char(c: char) -> bool {
     match c {
-        '\'' | '"' | '\\' | 'b' | 'f' |
-        'n'  | 'r' | 't'  | 'v' => true,
-        _ => false,
+        x if x.is_ascii_digit()    => false,
+        x if is_line_terminator(x) => false,
+        'x' => false,
+        'u' => false,
+        _   => true,
     }
 }
 
