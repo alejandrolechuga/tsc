@@ -331,16 +331,33 @@ where I: Iterator<Item = char>,
                     s.push('\\');
                     match self.next_char() {
                         Some(c) if c.is_ascii_digit() => {
-
+                            s.push(c);
                         },
                         Some(c) if is_line_terminator(c) => {
-
+                            s.push(c);
+                        },
+                        Some(c) if is_escapable_char(c) => {
+                            s.push(c);
                         },
                         Some('x') => {
-
+                            s.push('x');
+                            match self.peek() {
+                                Some(c) if c.is_ascii_hexdigit() => {
+                                    self.skip();
+                                    s.push(c);
+                                    match self.peek() {
+                                        Some(c) if c.is_ascii_hexdigit() => {
+                                            self.skip();
+                                            s.push(c);
+                                        },
+                                        _ => ()
+                                    }
+                                },
+                                _ => ()
+                            }
                         },
                         Some('u') => {
-
+                            s.push('u');
                         },
                         Some(c) => return Err(self.unexpected_char(c)),
                         None    => return Err(self.unexpected_eof()),
@@ -672,6 +689,7 @@ fn is_id_continue(c: char) -> bool {
     }
 }
 
+// TODO NonEscapeCharacter
 fn is_escapable_char(c: char) -> bool {
     match c {
         '\'' | '"' | '\\' | 'b' | 'f' |
