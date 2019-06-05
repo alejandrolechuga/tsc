@@ -166,8 +166,28 @@ where I: Iterator<Item = char>,
         // is the next thing x
         // next thing should hex digits
         match self.peek() {
-            Some(c) if c == 'x'|| c == 'X' => {
-                s.push(c);
+            Some('0') => {
+                s.push('0');
+                self.skip();
+                match self.peek() {
+                    Some(c) if c == 'x' || c == 'X' => {
+                        self.skip();
+                        s.push(c);
+                        match self.next_char() {
+                            Some(c) if c.is_ascii_hexdigit() => {
+                                s.push(c);
+                            },
+                            Some(c) => {
+                                return Err(self.unexpected_char(c))
+                            },
+                            None => return Err(self.unexpected_eof())
+                        }
+                        self.push_while(&mut s, |c| c.is_ascii_hexdigit())
+                    },
+                    Some(_) => (),
+                    None => ()
+                }
+
                 return Ok(TokenType::Number(s));
             },
             None => return Err(self.unexpected_eof()),
