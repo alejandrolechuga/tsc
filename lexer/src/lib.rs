@@ -15,7 +15,7 @@ pub struct Lexer<I>
 where I: Iterator<Item = char>,
 {
     column: u32,
-    line: u32,
+    line:   u32,
     stream: Peekable<I>,
 }
 
@@ -103,7 +103,7 @@ where I: Iterator<Item = char>,
         let mut s = String::new();
         self.skip();
         match style {
-            CommentStyle::SingleLine => self.push_while(&mut s, is_line_terminator),
+            CommentStyle::SingleLine => self.push_while(&mut s, |x| !is_line_terminator(x)),
             CommentStyle::MultiLine => {
                 loop {
                     match self.next_char() {
@@ -118,7 +118,7 @@ where I: Iterator<Item = char>,
                             }
                         },
                         Some(c) => s.push(c),
-                        None => return Err(self.unexpected_eof()),
+                        None    => return Err(self.unexpected_eof()),
                     }
                 }
             },
@@ -136,8 +136,6 @@ where I: Iterator<Item = char>,
 
     fn string(&mut self, quote: QuoteStyle) -> Result<TokenType, LexError> {
         let mut s = String::new();
-
-        // Skip leading quote
         self.skip();
 
         loop {
@@ -152,7 +150,7 @@ where I: Iterator<Item = char>,
                 },
                 Some(c) if is_line_terminator(c) => return Err(self.unexpected_char(c)),
                 Some(c) => s.push(c),
-                None => return Err(self.unexpected_eof()),
+                None    => return Err(self.unexpected_eof()),
             }
         }
 
@@ -163,6 +161,7 @@ where I: Iterator<Item = char>,
     // matches constructs beginning with a digit, e.g. 0.123 or 10e+42
     fn digit(&mut self) -> Result<TokenType, LexError> {
         let mut s = String::new();
+
         // is digit 0
         // is the next thing x
         // next thing should hex digits
@@ -201,11 +200,8 @@ where I: Iterator<Item = char>,
     fn decimal(&mut self) -> Result<String, LexError> {
         self.skip();
         let mut s = String::new();
-        match self.peek() {
-            Some(c) if c.is_ascii_digit() => {
-                self.skip();
-                s.push(c);
-            },
+        match self.next_char() {
+            Some(c) if c.is_ascii_digit() => s.push(c),
             Some(c) => return Err(self.unexpected_char(c)),
             None    => return Err(self.unexpected_eof()),
         }
@@ -306,12 +302,12 @@ where I: Iterator<Item = char>,
     }
 
     fn template(&mut self, loc: Location) -> Result<Token, LexError> {
-        let mut s = String::new();
         self.skip();
+        let mut s = String::new();
+
         loop {
-            match self.peek() {
+            match self.next_char() {
                 Some('$') => {
-                    self.skip();
                     s.push('$');
                     match self.peek() {
                         Some('{') => {
@@ -327,42 +323,11 @@ where I: Iterator<Item = char>,
                     }
                 },
                 Some('\\') => {
-                    self.skip();
                     s.push('\\');
                     match self.next_char() {
-                        Some(c) if c.is_ascii_digit() => {
-                            s.push(c);
-                        },
-                        Some(c) if is_line_terminator(c) => {
-                            s.push(c);
-                        },
-                        Some(c) if is_escapable_char(c) => {
-                            s.push(c);
-                        },
-                        Some('x') => {
-                            s.push('x');
-                            match self.peek() {
-                                Some(c) if c.is_ascii_hexdigit() => {
-                                    self.skip();
-                                    s.push(c);
-                                    match self.peek() {
-                                        Some(c) if c.is_ascii_hexdigit() => {
-                                            self.skip();
-                                            s.push(c);
-                                        },
-                                        _ => ()
-                                    }
-                                },
-                                _ => ()
-                            }
-                        },
-                        Some('u') => {
-                            s.push('u');
-                        },
-                        Some(c) => return Err(self.unexpected_char(c)),
+                        Some(c) => s.push(c),
                         None    => return Err(self.unexpected_eof()),
                     }
-                    // EscapeSequence|NotEscapeSequence|LineContinuation
                 },
                 Some('`') => {
                     self.skip();
