@@ -11,9 +11,15 @@ use self::location::Location;
 use self::token::{CommentStyle,QuoteStyle,Token,TokenType};
 use self::lexerror::LexError;
 
+pub enum LexGoal {
+    InputElementDiv,
+    InputElementRegExp,
+}
+
 pub struct Lexer<I>
 where I: Iterator<Item = char>,
 {
+    goal:   LexGoal,
     column: u32,
     line:   u32,
     stream: Peekable<I>,
@@ -24,8 +30,9 @@ where I: Iterator<Item = char>,
 {
     pub fn new(stream: I) -> Lexer<I> {
         Lexer {
+            goal:   LexGoal::InputElementDiv,
             column: 1,
-            line: 1,
+            line:   1,
             stream: stream.peekable()
         }
     }
@@ -97,6 +104,10 @@ where I: Iterator<Item = char>,
     fn scalar(&mut self, loc: Location, typ: TokenType) -> Token {
         self.skip();
         Token::new(loc, typ)
+    }
+
+    pub fn set_goal(&mut self, goal: LexGoal) {
+        self.goal = goal;
     }
 
     fn comment(&mut self, loc: Location, style: CommentStyle) -> Result<Token, LexError> {
@@ -633,6 +644,10 @@ where I: Iterator<Item = char>,
         s.shrink_to_fit();
         Ok(s)
     }
+
+    fn regex(&mut self, loc: Location) -> Result<Token, LexError> {
+        Ok(Token::new(loc, TokenType::RegExp("".to_string())))
+    }
 }
 
 fn is_line_terminator(c: char) -> bool {
@@ -697,7 +712,12 @@ where I: Iterator<Item = char>
                 x if x.is_ascii_digit() => self.digit().map(|x| Token::new(loc, x)),
                 x if is_id_start(x)     => self.identifier(loc),
                 '`'  => self.template(loc),
-                '/'  => self.slash(loc),
+                '/'  => {
+                    match self.goal {
+                        LexGoal::InputElementDiv => self.slash(loc),
+                        LexGoal::InputElementRegExp => self.regex(loc),
+                    }
+                },
                 '\'' => self.string(QuoteStyle::Single).map(|x| Token::new(loc, x)),
                 '"'  => self.string(QuoteStyle::Double).map(|x| Token::new(loc, x)),
                 '{'  => Ok(self.scalar(loc, TokenType::LeftBrace)),
