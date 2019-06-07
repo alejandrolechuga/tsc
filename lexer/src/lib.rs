@@ -646,7 +646,72 @@ where I: Iterator<Item = char>,
     }
 
     fn regex(&mut self, loc: Location) -> Result<Token, LexError> {
-        Ok(Token::new(loc, TokenType::RegExp("".to_string())))
+        self.skip();
+        let mut s = String::new();
+
+        match self.peek() {
+            Some('*') => return Err(self.unexpected_char('*')),
+            Some('/') => return Err(self.unexpected_char('/')),
+            _ => (),
+        }
+
+        // body
+        loop {
+            match self.next_char() {
+                Some('/') => {
+                    break
+                },
+                Some('[') => {
+                    s.push('[');
+                    loop {
+                        match self.next_char() {
+                            Some(']')  => break,
+                            Some('\\') => {
+                                match self.next_char() {
+                                    Some(c) if is_line_terminator(c) => return Err(self.unexpected_char(c)),
+                                    Some(c) => s.push(c),
+                                    None    => return Err(self.unexpected_eof()),
+                                }
+                            },
+                            Some(c) if is_line_terminator(c) => return Err(self.unexpected_char(c)),
+                            Some(c) => s.push(c),
+                            None => return Err(self.unexpected_eof()),
+                        }
+                    }
+                },
+                Some('\\') => {
+                    s.push('\\');
+                    match self.next_char() {
+                        Some(c) if is_line_terminator(c) => return Err(self.unexpected_char(c)),
+                        Some(c) => s.push(c),
+                        None    => return Err(self.unexpected_eof()),
+                    }
+                },
+                Some(c) if is_line_terminator(c) => return Err(self.unexpected_char(c)),
+                Some(c) => s.push(c),
+                None    => return Err(self.unexpected_eof()),
+            }
+        }
+
+        // flags
+        loop {
+            match self.peek() {
+                Some('\\') => {
+                    match self.unicode_escape() {
+                        Ok(esc) => s.push_str(&esc),
+                        Err(e)  => return Err(e),
+                    }
+                },
+                Some(c) if is_id_continue(c) => {
+                    s.push(c);
+                    self.skip();
+                },
+                _ => break,
+            }
+        }
+
+        s.shrink_to_fit();
+        Ok(Token::new(loc, TokenType::RegExp(s)))
     }
 }
 
