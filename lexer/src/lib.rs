@@ -820,56 +820,104 @@ mod tests {
 
     #[test]
     fn identifies_whitespace() {
-        let input = " \t\t ";
-        let output = first_token(input);
-        assert_eq!(token_text(output), input);
+        verify_single(" \t\t ");
     }
 
     #[test]
     fn identifies_comments() {
-        let input = "//this is a comment";
-        let output = first_token(input);
-        assert_eq!(token_text(output), input);
+        verify_single("//this is a comment");
     }
 
     #[test]
     fn identifies_single_strings() {
-        let input = "'this is a string'";
-        let output = first_token(input);
-        assert_eq!(token_text(output), input);
+        verify_single("'this is a string'");
     }
 
     #[test]
     fn identifies_double_strings() {
-        let input = r#""this is a string""#;
-        let output = first_token(input);
-        assert_eq!(token_text(output), input);
+        verify_single(r#""this is a string""#);
     }
 
     #[test]
     fn identifies_div() {
-        let input = "/";
-        let output = first_token(input);
-        assert_eq!(token_text(output), input);
+        verify_single("/");
     }
 
     #[test]
     fn identifies_div_equals() {
-        let input = "/=";
-        let output = first_token(input);
-        assert_eq!(token_text(output), input);
+        verify_single("/=");
     }
 
     #[test]
     fn identifies_right_brace() {
-        let input = "}";
-        let output = first_token(input);
+        verify_single("}");
+    }
+
+    #[test]
+    fn identifies_zero() {
+        verify_single("0");
+    }
+
+    #[test]
+    fn identifies_int() {
+        verify_single("42");
+    }
+
+    #[test]
+    fn identifies_decimal() {
+        verify_single(".123");
+    }
+
+    #[test]
+    fn identifies_zero_decimal() {
+        verify_single("0.123");
+    }
+
+    #[test]
+    fn identifies_regex() {
+        verify_single("/[0-9]/i");
+    }
+
+    #[test]
+    fn identifies_dot() {
+        verify_single(".");
+    }
+
+    #[test]
+    fn identifies_ellipsis() {
+        verify_single("...");
+    }
+
+    #[test]
+    fn identifies_assignment() {
+        verify_single("=");
+    }
+
+    #[test]
+    fn identifies_double_equals() {
+        verify_single("==");
+    }
+
+    #[test]
+    fn identifies_triple_equals() {
+        verify_single("===");
+    }
+
+    #[test]
+    fn identifies_arrow() {
+        verify_single("=>");
+    }
+
+    fn verify_single(input: &str) {
+        let output = single_token(input);
         assert_eq!(token_text(output), input);
     }
 
-    fn first_token(input: &str) -> Option<Result<Token, LexError>> {
+    fn single_token(input: &str) -> Option<Result<Token, LexError>> {
         let mut lexer = Lexer::new(input.chars());
-        lexer.next()
+        let ret = lexer.next();
+        assert!(lexer.next().is_none(), "lexed more than one token");
+        ret
     }
 
     fn token_text(tok: Option<Result<Token, LexError>>) -> String {
