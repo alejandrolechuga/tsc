@@ -1,8 +1,6 @@
-use super::location::Location;
-
 #[derive(Debug)]
 pub enum LexError {
     InvalidCodePoint(String),
-    UnexpectedEndOfInput(Location),
-    UnexpectedCharacter(Location, char),
+    UnexpectedEndOfInput(u32, u32),
+    UnexpectedCharacter(u32, u32, char),
 }

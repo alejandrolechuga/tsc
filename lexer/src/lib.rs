@@ -1,13 +1,14 @@
 extern crate unicode;
 
-use std::iter::Peekable;
 use unicode::{is,UnicodeProperty};
 
 mod lexerror;
+mod lexstream;
 mod location;
 mod token;
 
 use self::location::Location;
+use self::lexstream::LexStream;
 use self::token::{CommentStyle,QuoteStyle,Token,TokenType};
 use self::lexerror::LexError;
 
@@ -20,9 +21,7 @@ pub struct Lexer<I>
 where I: Iterator<Item = char>,
 {
     goal:   LexGoal,
-    column: u32,
-    line:   u32,
-    stream: Peekable<I>,
+    stream: LexStream<I>,
 }
 
 impl<I> Lexer<I>
@@ -31,78 +30,22 @@ where I: Iterator<Item = char>,
     pub fn new(stream: I) -> Lexer<I> {
         Lexer {
             goal:   LexGoal::InputElementDiv,
-            column: 1,
-            line:   1,
-            stream: stream.peekable()
-        }
-    }
-
-    fn get_location(&self) -> Location {
-        Location::new(self.line, self.column)
-    }
-
-    fn next_char(&mut self) -> Option<char> {
-        match self.stream.next() {
-            Some('\n') => {
-                self.line += 1;
-                self.column = 1;
-                Some('\n')
-            },
-            Some(x) => {
-                self.column += 1;
-                Some(x)
-            },
-            None => None,
-        }
-    }
-
-    fn peek(&mut self) -> Option<char> {
-        self.stream.peek().map(|x| *x)
-    }
-
-    fn skip(&mut self) {
-        self.next_char();
-    }
-
-    fn skip_if(&mut self, c: char) -> bool {
-        match self.peek() {
-            Some(x) if c == x => {
-                self.skip();
-                true
-            },
-            _ => false,
-        }
-    }
-
-    fn push_while<P>(&mut self, s: &mut String, predicate: P)
-    where P: Fn(char) -> bool,
-    {
-        loop {
-            match self.peek() {
-                Some(x) => {
-                    if !predicate(x) {
-                        break
-                    }
-                    s.push(x);
-                    self.skip();
-                },
-                None => break
-            }
+            stream: LexStream::new(stream),
         }
     }
 
     fn unexpected_char(&self, c: char) -> LexError {
-        let loc = self.get_location();
-        LexError::UnexpectedCharacter(loc, c)
+        let (line, col) = self.stream.location();
+        LexError::UnexpectedCharacter(line, col, c)
     }
 
     fn unexpected_eof(&self) -> LexError {
-        let loc = self.get_location();
-        LexError::UnexpectedEndOfInput(loc)
+        let (line, col) = self.stream.location();
+        LexError::UnexpectedEndOfInput(line, col)
     }
 
     fn scalar(&mut self, loc: Location, typ: TokenType) -> Token {
-        self.skip();
+        self.stream.skip_char();
         Token::new(loc, typ)
     }
 
@@ -112,14 +55,14 @@ where I: Iterator<Item = char>,
 
     fn comment(&mut self, loc: Location, style: CommentStyle) -> Result<Token, LexError> {
         let mut s = String::new();
-        self.skip();
+        self.stream.skip_char();
         match style {
-            CommentStyle::SingleLine => self.push_while(&mut s, |x| !is_line_terminator(x)),
+            CommentStyle::SingleLine => self.stream.push_while(&mut s, |x| !is_line_terminator(x)),
             CommentStyle::MultiLine => {
                 loop {
-                    match self.next_char() {
+                    match self.stream.next() {
                         Some('*') => {
-                            match self.next_char() {
+                            match self.stream.next() {
                                 Some('/') => break,
                                 Some(c) => {
                                     s.push('*');
@@ -140,17 +83,17 @@ where I: Iterator<Item = char>,
 
     fn ws(&mut self) -> TokenType {
         let mut s = String::new();
-        self.push_while(&mut s, is_ws);
+        self.stream.push_while(&mut s, is_ws);
         s.shrink_to_fit();
         TokenType::WhiteSpace(s)
     }
 
     fn string(&mut self, quote: QuoteStyle) -> Result<TokenType, LexError> {
         let mut s = String::new();
-        self.skip();
+        self.stream.skip_char();
 
         loop {
-            match self.next_char() {
+            match self.stream.next() {
                 Some('"')  if quote == QuoteStyle::Double => break,
                 Some('\'') if quote == QuoteStyle::Single => break,
                 Some('\\') => {
@@ -176,15 +119,15 @@ where I: Iterator<Item = char>,
         // is digit 0
         // is the next thing x
         // next thing should hex digits
-        match self.peek() {
+        match self.stream.peek() {
             Some('0') => {
                 s.push('0');
-                self.skip();
-                match self.peek() {
+                self.stream.skip_char();
+                match self.stream.peek() {
                     Some(c) if c == 'x' || c == 'X' => {
-                        self.skip();
+                        self.stream.skip_char();
                         s.push(c);
-                        match self.next_char() {
+                        match self.stream.next() {
                             Some(c) if c.is_ascii_hexdigit() => {
                                 s.push(c);
                             },
@@ -193,7 +136,7 @@ where I: Iterator<Item = char>,
                             },
                             None => return Err(self.unexpected_eof())
                         }
-                        self.push_while(&mut s, |c| c.is_ascii_hexdigit())
+                        self.stream.push_while(&mut s, |c| c.is_ascii_hexdigit())
                     },
                     Some(_) => (),
                     None => ()
@@ -206,10 +149,10 @@ where I: Iterator<Item = char>,
         }
 
         // integer part
-        self.push_while(&mut s, |c| c.is_ascii_digit());
+        self.stream.push_while(&mut s, |c| c.is_ascii_digit());
 
         // decimal part
-        if let Some('.') = self.peek() {
+        if let Some('.') = self.stream.peek() {
             match self.decimal() {
                 Ok(d) => s.push_str(&d),
                 Err(e) => return Err(e),
@@ -217,7 +160,7 @@ where I: Iterator<Item = char>,
         }
 
         // exponent part
-        if let Some('e') | Some('E') = self.peek() {
+        if let Some('e') | Some('E') = self.stream.peek() {
             match self.exponent() {
                 Ok(e)  => s.push_str(&e),
                 Err(e) => return Err(e),
@@ -229,46 +172,46 @@ where I: Iterator<Item = char>,
     }
 
     fn decimal(&mut self) -> Result<String, LexError> {
-        self.skip();
+        self.stream.skip_char();
         let mut s = String::new();
-        match self.next_char() {
+        match self.stream.next() {
             Some(c) if c.is_ascii_digit() => s.push(c),
             Some(c) => return Err(self.unexpected_char(c)),
             None    => return Err(self.unexpected_eof()),
         }
 
-        self.push_while(&mut s, |c| c.is_ascii_digit());
+        self.stream.push_while(&mut s, |c| c.is_ascii_digit());
 
         s.shrink_to_fit();
         Ok(s)
     }
 
     fn exponent(&mut self) -> Result<String, LexError> {
-        self.skip();
+        self.stream.skip_char();
         let mut s = String::new();
-        match self.peek() {
+        match self.stream.peek() {
             Some(c) if c == '+' || c == '-' => {
-                self.skip();
+                self.stream.skip_char();
                 s.push(c);
             },
             _ => (),
         }
 
-        match self.next_char() {
+        match self.stream.next() {
             Some(d) if d.is_ascii_digit() => s.push(d),
             Some(c) => return Err(self.unexpected_char(c)),
             None    => return Err(self.unexpected_eof()),
         }
 
-        self.push_while(&mut s, |d| d.is_ascii_digit());
+        self.stream.push_while(&mut s, |d| d.is_ascii_digit());
 
         s.shrink_to_fit();
         Ok(s)
     }
 
     fn slash(&mut self, loc: Location) -> Result<Token, LexError> {
-        self.skip();
-        match self.peek() {
+        self.stream.skip_char();
+        match self.stream.peek() {
             Some('/') => self.comment(loc, CommentStyle::SingleLine),
             Some('*') => self.comment(loc, CommentStyle::MultiLine),
             Some('=') => Ok(self.scalar(loc, TokenType::DivEqual)),
@@ -278,11 +221,11 @@ where I: Iterator<Item = char>,
     }
 
     fn escape_or_line_continuation(&mut self) -> Result<String, LexError> {
-        match self.next_char() {
+        match self.stream.next() {
             // Line continuation
             Some(c) if is_line_terminator(c) => {
-                if c == '\u{000D}' && self.peek() == Some('\u{000A}') {
-                    self.skip();
+                if c == '\u{000D}' && self.stream.peek() == Some('\u{000A}') {
+                    self.stream.skip_char();
                     let s = "\\\u{000D}\u{000A}".to_string();
                     Ok(s)
                 } else {
@@ -293,8 +236,8 @@ where I: Iterator<Item = char>,
             Some(c) if is_escapable_char(c) => Ok(format!("\\{}", c)),
             // 0
             Some('0') => {
-                self.skip();
-                match self.peek() {
+                self.stream.skip_char();
+                match self.stream.peek() {
                     Some(c) if c.is_ascii_digit() => Err(self.unexpected_char(c)),
                     _ => Ok("\\0".to_string()),
                 }
@@ -304,15 +247,15 @@ where I: Iterator<Item = char>,
                 let mut s = String::with_capacity(4);
                 s.push('\\');
                 s.push('x');
-                self.skip();
+                self.stream.skip_char();
 
-                match self.peek() {
+                match self.stream.peek() {
                     Some(c) if c.is_ascii_hexdigit() => {
                         s.push(c);
-                        self.skip();
-                        match self.peek() {
+                        self.stream.skip_char();
+                        match self.stream.peek() {
                             Some(c) if c.is_ascii_hexdigit() => {
-                                self.skip();
+                                self.stream.skip_char();
                                 s.push(c);
                                 Ok(s)
                             },
@@ -333,21 +276,21 @@ where I: Iterator<Item = char>,
     }
 
     fn template(&mut self, loc: Location) -> Result<Token, LexError> {
-        self.skip();
+        self.stream.skip_char();
         let mut s = String::new();
 
         loop {
-            match self.next_char() {
+            match self.stream.next() {
                 Some('$') => {
                     s.push('$');
-                    match self.peek() {
+                    match self.stream.peek() {
                         Some('{') => {
                             s.push('{');
-                            self.skip();
+                            self.stream.skip_char();
                             break;
                         },
                         Some(c) => {
-                            self.skip();
+                            self.stream.skip_char();
                             s.push(c);
                         },
                         None => return Err(self.unexpected_eof()),
@@ -355,13 +298,13 @@ where I: Iterator<Item = char>,
                 },
                 Some('\\') => {
                     s.push('\\');
-                    match self.next_char() {
+                    match self.stream.next() {
                         Some(c) => s.push(c),
                         None    => return Err(self.unexpected_eof()),
                     }
                 },
                 Some('`') => {
-                    self.skip();
+                    self.stream.skip_char();
                     s.push('`');
                     break;
                 },
@@ -377,10 +320,10 @@ where I: Iterator<Item = char>,
     }
 
     fn equal(&mut self) -> TokenType {
-        if self.skip_if('>') {
+        if self.stream.skip_if('>') {
             TokenType::Arrow
-        } else if self.skip_if('=') {
-            if self.skip_if('=') {
+        } else if self.stream.skip_if('=') {
+            if self.stream.skip_if('=') {
                 TokenType::TripleEquals
             } else {
                 TokenType::DoubleEquals
@@ -391,9 +334,9 @@ where I: Iterator<Item = char>,
     }
 
     fn bang(&mut self) -> TokenType {
-        self.skip();
-        if self.skip_if('=') {
-            if self.skip_if('=') {
+        self.stream.skip_char();
+        if self.stream.skip_if('=') {
+            if self.stream.skip_if('=') {
                 TokenType::NotTripleEquals
             } else {
                 TokenType::NotEquals
@@ -404,10 +347,10 @@ where I: Iterator<Item = char>,
     }
 
     fn ampersand(&mut self) -> TokenType {
-        self.skip();
-        if self.skip_if('&') {
+        self.stream.skip_char();
+        if self.stream.skip_if('&') {
             TokenType::LogicalAnd
-        } else if self.skip_if('=') {
+        } else if self.stream.skip_if('=') {
             TokenType::BinaryAndEquals
         } else {
             TokenType::BinaryAnd
@@ -415,10 +358,10 @@ where I: Iterator<Item = char>,
     }
 
     fn pipe(&mut self) -> TokenType {
-        self.skip();
-        if self.skip_if('|') {
+        self.stream.skip_char();
+        if self.stream.skip_if('|') {
             TokenType::LogicalOr
-        } else if self.skip_if('=') {
+        } else if self.stream.skip_if('=') {
             TokenType::BinaryOrEquals
         } else {
             TokenType::BinaryOr
@@ -426,8 +369,8 @@ where I: Iterator<Item = char>,
     }
 
     fn caret(&mut self) -> TokenType {
-        self.skip();
-        if self.skip_if('=') {
+        self.stream.skip_char();
+        if self.stream.skip_if('=') {
             TokenType::BinaryXorEquals
         } else {
             TokenType::BinaryXor
@@ -435,10 +378,10 @@ where I: Iterator<Item = char>,
     }
 
     fn minus(&mut self) -> TokenType {
-        self.skip();
-        if self.skip_if('-') {
+        self.stream.skip_char();
+        if self.stream.skip_if('-') {
             TokenType::Decrement
-        } else if self.skip_if('=') {
+        } else if self.stream.skip_if('=') {
             TokenType::MinusEquals
         } else {
             TokenType::Minus
@@ -446,10 +389,10 @@ where I: Iterator<Item = char>,
     }
 
     fn plus(&mut self) -> TokenType {
-        self.skip();
-        if self.skip_if('+') {
+        self.stream.skip_char();
+        if self.stream.skip_if('+') {
             TokenType::Increment
-        } else if self.skip_if('=') {
+        } else if self.stream.skip_if('=') {
             TokenType::PlusEquals
         } else {
             TokenType::Plus
@@ -457,18 +400,18 @@ where I: Iterator<Item = char>,
     }
 
     fn gt(&mut self) -> TokenType {
-        self.skip();
+        self.stream.skip_char();
 
-        if self.skip_if('=') {
+        if self.stream.skip_if('=') {
             TokenType::GreaterThanEqualTo
-        } else if self.skip_if('>') {
-            if self.skip_if('>') {
-                if self.skip_if('=') {
+        } else if self.stream.skip_if('>') {
+            if self.stream.skip_if('>') {
+                if self.stream.skip_if('=') {
                     TokenType::TripleRightShiftEquals
                 } else {
                     TokenType::TripleRightShift
                 }
-            } else if self.skip_if('=') {
+            } else if self.stream.skip_if('=') {
                 TokenType::RightShiftEquals
             } else {
                 TokenType::RightShift
@@ -479,13 +422,13 @@ where I: Iterator<Item = char>,
     }
 
     fn lt(&mut self) -> TokenType {
-        if self.skip_if('<') {
-            if self.skip_if('=') {
+        if self.stream.skip_if('<') {
+            if self.stream.skip_if('=') {
                 TokenType::LeftShiftEquals
             } else {
                 TokenType::LeftShift
             }
-        } else if self.skip_if('=') {
+        } else if self.stream.skip_if('=') {
             TokenType::LessThanEqualTo
         } else {
             TokenType::LessThan
@@ -493,11 +436,11 @@ where I: Iterator<Item = char>,
     }
 
     fn period(&mut self, loc: Location) -> Result<Token, LexError> {
-        self.skip();
-        match self.peek() {
+        self.stream.skip_char();
+        match self.stream.peek() {
             Some('.') => {
-                self.skip();
-                match self.next_char() {
+                self.stream.skip_char();
+                match self.stream.next() {
                     Some('.') => Ok(Token::new(loc, TokenType::Ellipsis)),
                     Some(c)   => Err(self.unexpected_char(c)),
                     None      => Err(self.unexpected_eof()),
@@ -511,7 +454,7 @@ where I: Iterator<Item = char>,
     }
 
     fn percent(&mut self) -> TokenType {
-        if self.skip_if('=') {
+        if self.stream.skip_if('=') {
             TokenType::PercentEquals
         } else {
             TokenType::Percent
@@ -519,13 +462,13 @@ where I: Iterator<Item = char>,
     }
 
     fn asterisk(&mut self) -> TokenType {
-        if self.skip_if('*') {
-            if self.skip_if('=') {
+        if self.stream.skip_if('*') {
+            if self.stream.skip_if('=') {
                 TokenType::PowerEquals
             } else {
                 TokenType::Power
             }
-        } else if self.skip_if('=') {
+        } else if self.stream.skip_if('=') {
             TokenType::TimesEquals
         } else {
             TokenType::Times
@@ -536,7 +479,7 @@ where I: Iterator<Item = char>,
         let mut s = String::new();
 
         // Head char
-        match self.peek() {
+        match self.stream.peek() {
             Some('\\') => {
                 match self.unicode_escape() {
                     Ok(x)  => s.push_str(&x),
@@ -544,7 +487,7 @@ where I: Iterator<Item = char>,
                 }
             },
             Some(c) if is_id_start(c) => {
-                self.skip();
+                self.stream.skip_char();
                 s.push(c);
             },
             Some(c) => return Err(self.unexpected_char(c)),
@@ -553,7 +496,7 @@ where I: Iterator<Item = char>,
 
         // Tail chars
         loop {
-            match self.peek() {
+            match self.stream.peek() {
                 Some('\\') => {
                     match self.unicode_escape() {
                         Ok(x)  => s.push_str(&x),
@@ -561,7 +504,7 @@ where I: Iterator<Item = char>,
                     }
                 },
                 Some(c) if is_id_continue(c) => {
-                    self.skip();
+                    self.stream.skip_char();
                     s.push(c);
                 },
                 Some(_) |
@@ -578,19 +521,19 @@ where I: Iterator<Item = char>,
 
         // "\"
         s.push('\\');
-        self.skip();
+        self.stream.skip_char();
 
         // "u"
-        match self.peek() {
+        match self.stream.peek() {
             Some('u') => {
                 s.push('u');
-                self.skip()
+                self.stream.skip_char();
             },
             Some(c)   => return Err(self.unexpected_char(c)),
             None      => return Err(self.unexpected_eof()),
         }
 
-        match self.peek() {
+        match self.stream.peek() {
             Some('{') => {
                 // {CodePoint}
                 s.push('{');
@@ -598,7 +541,7 @@ where I: Iterator<Item = char>,
                 // code point hex chars
                 let mut cp = String::with_capacity(5);
                 loop {
-                    match self.peek() {
+                    match self.stream.peek() {
                         Some(c) if c.is_ascii_hexdigit() => {
                             cp.push(c);
                             s.push(c);
@@ -617,10 +560,10 @@ where I: Iterator<Item = char>,
                 }
 
                 // Closing brace
-                match self.peek() {
+                match self.stream.peek() {
                     Some('}') => {
                         s.push('}');
-                        self.skip();
+                        self.stream.skip_char();
                     },
                     Some(c) => return Err(self.unexpected_char(c)),
                     None    => return Err(self.unexpected_eof()),
@@ -629,9 +572,9 @@ where I: Iterator<Item = char>,
             _ => {
                 // Hex4Digits
                 for _i in 0..4 {
-                    match self.peek() {
+                    match self.stream.peek() {
                         Some(c) if c.is_ascii_hexdigit() => {
-                            self.skip();
+                            self.stream.skip_char();
                             s.push(c);
                         },
                         Some(c) => return Err(self.unexpected_char(c)),
@@ -646,10 +589,10 @@ where I: Iterator<Item = char>,
     }
 
     fn regex(&mut self, loc: Location) -> Result<Token, LexError> {
-        self.skip();
+        self.stream.skip_char();
         let mut s = String::new();
 
-        match self.peek() {
+        match self.stream.peek() {
             Some('*') => return Err(self.unexpected_char('*')),
             Some('/') => return Err(self.unexpected_char('/')),
             _ => (),
@@ -657,17 +600,17 @@ where I: Iterator<Item = char>,
 
         // body
         loop {
-            match self.next_char() {
+            match self.stream.next() {
                 Some('/') => {
                     break
                 },
                 Some('[') => {
                     s.push('[');
                     loop {
-                        match self.next_char() {
+                        match self.stream.next() {
                             Some(']')  => break,
                             Some('\\') => {
-                                match self.next_char() {
+                                match self.stream.next() {
                                     Some(c) if is_line_terminator(c) => return Err(self.unexpected_char(c)),
                                     Some(c) => s.push(c),
                                     None    => return Err(self.unexpected_eof()),
@@ -681,7 +624,7 @@ where I: Iterator<Item = char>,
                 },
                 Some('\\') => {
                     s.push('\\');
-                    match self.next_char() {
+                    match self.stream.next() {
                         Some(c) if is_line_terminator(c) => return Err(self.unexpected_char(c)),
                         Some(c) => s.push(c),
                         None    => return Err(self.unexpected_eof()),
@@ -695,7 +638,7 @@ where I: Iterator<Item = char>,
 
         // flags
         loop {
-            match self.peek() {
+            match self.stream.peek() {
                 Some('\\') => {
                     match self.unicode_escape() {
                         Ok(esc) => s.push_str(&esc),
@@ -704,14 +647,14 @@ where I: Iterator<Item = char>,
                 },
                 Some(c) if is_id_continue(c) => {
                     s.push(c);
-                    self.skip();
+                    self.stream.skip_char();
                 },
                 _ => break,
             }
         }
 
         s.shrink_to_fit();
-        Ok(Token::new(loc, TokenType::RegExp(s)))
+        Ok(Token::new(loc, TokenType::RegExp(s, "".to_string())))
     }
 }
 
@@ -770,8 +713,8 @@ where I: Iterator<Item = char>
     type Item = Result<Token, LexError>;
 
     fn next(&mut self) -> Option<Result<Token, LexError>> {
-        let loc = self.get_location();
-        self.peek().map(|next| {
+        let loc = self.stream.location();
+        self.stream.peek().map(|next| {
             match next {
                 x if is_ws(x)           => Ok(Token::new(loc, self.ws())),
                 x if x.is_ascii_digit() => self.digit().map(|x| Token::new(loc, x)),

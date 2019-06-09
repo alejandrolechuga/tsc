@@ -74,7 +74,7 @@ pub enum TokenType {
     Power,
     PowerEquals,
     Question,
-    RegExp(String),
+    RegExp(String, String),
     RightBrace,
     RightBracket,
     RightParen,
@@ -139,7 +139,7 @@ impl fmt::Display for TokenType {
             TokenType::PowerEquals => write!(f, "**="),
             TokenType::Power => write!(f, "**"),
             TokenType::Question => write!(f, "?"),
-            TokenType::RegExp(s) => write!(f, "{}", s),
+            TokenType::RegExp(body, flags) => write!(f, "/{}/{}", body, flags),
             TokenType::RightBrace => write!(f, "}}"),
             TokenType::RightBracket => write!(f, "]"),
             TokenType::RightParen => write!(f, ")"),
@@ -161,7 +161,7 @@ impl fmt::Display for TokenType {
 }
 
 impl Token {
-    pub fn new(loc: Location, typ: TokenType) -> Token {
-        Token { column: loc.column, line: loc.line, typ, }
+    pub fn new((line, column): Location, typ: TokenType) -> Token {
+        Token { column, line, typ, }
     }
 }
