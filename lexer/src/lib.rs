@@ -160,6 +160,7 @@ where I: Iterator<Item = char>,
 
         // decimal part
         if let Some('.') = self.stream.peek() {
+            self.stream.skip_char();
             match self.decimal() {
                 Ok(d) => s.push_str(&d),
                 Err(e) => return Err(e),
@@ -178,9 +179,11 @@ where I: Iterator<Item = char>,
         Ok(TokenType::Number(s))
     }
 
+    // Assumes the "." has been skipped
     fn decimal(&mut self) -> Result<String, LexError> {
-        self.stream.skip_char();
+        // self.stream.skip_char();
         let mut s = String::new();
+        s.push('.');
         match self.stream.next() {
             Some(c) if c.is_ascii_digit() => s.push(c),
             Some(c) => return Err(self.unexpected_char(c)),
@@ -430,6 +433,7 @@ where I: Iterator<Item = char>,
     }
 
     fn lt(&mut self) -> TokenType {
+        self.stream.skip_char();
         if self.stream.skip_if('<') {
             if self.stream.skip_if('=') {
                 TokenType::LeftShiftEquals
@@ -598,11 +602,10 @@ where I: Iterator<Item = char>,
 
     fn regex(&mut self, loc: Location) -> Result<Token, LexError> {
         self.stream.skip_char();
-        let mut s = String::new();
+        let mut body = String::new();
 
         match self.stream.peek() {
-            Some('*') => return Err(self.unexpected_char('*')),
-            Some('/') => return Err(self.unexpected_char('/')),
+            Some(c) if c == '*' || c == '/' => return Err(self.unexpected_char(c)),
             _ => (),
         }
 
@@ -613,56 +616,61 @@ where I: Iterator<Item = char>,
                     break
                 },
                 Some('[') => {
-                    s.push('[');
+                    body.push('[');
                     loop {
                         match self.stream.next() {
-                            Some(']')  => break,
+                            Some(']')  => {
+                                body.push(']');
+                                break
+                            },
                             Some('\\') => {
                                 match self.stream.next() {
                                     Some(c) if is_line_terminator(c) => return Err(self.unexpected_char(c)),
-                                    Some(c) => s.push(c),
+                                    Some(c) => body.push(c),
                                     None    => return Err(self.unexpected_eof()),
                                 }
                             },
                             Some(c) if is_line_terminator(c) => return Err(self.unexpected_char(c)),
-                            Some(c) => s.push(c),
+                            Some(c) => body.push(c),
                             None => return Err(self.unexpected_eof()),
                         }
                     }
                 },
                 Some('\\') => {
-                    s.push('\\');
+                    body.push('\\');
                     match self.stream.next() {
                         Some(c) if is_line_terminator(c) => return Err(self.unexpected_char(c)),
-                        Some(c) => s.push(c),
+                        Some(c) => body.push(c),
                         None    => return Err(self.unexpected_eof()),
                     }
                 },
                 Some(c) if is_line_terminator(c) => return Err(self.unexpected_char(c)),
-                Some(c) => s.push(c),
+                Some(c) => body.push(c),
                 None    => return Err(self.unexpected_eof()),
             }
         }
 
         // flags
+        let mut flags = String::new();
         loop {
             match self.stream.peek() {
                 Some('\\') => {
                     match self.unicode_escape() {
-                        Ok(esc) => s.push_str(&esc),
+                        Ok(esc) => flags.push_str(&esc),
                         Err(e)  => return Err(e),
                     }
                 },
                 Some(c) if is_id_continue(c) => {
-                    s.push(c);
+                    flags.push(c);
                     self.stream.skip_char();
                 },
                 _ => break,
             }
         }
 
-        s.shrink_to_fit();
-        Ok(Token::new(loc, TokenType::RegExp(s, "".to_string())))
+        body.shrink_to_fit();
+        flags.shrink_to_fit();
+        Ok(Token::new(loc, TokenType::RegExp(body, flags)))
     }
 }
 
@@ -777,7 +785,12 @@ mod tests {
 
     #[test]
     fn identifies_regex() {
-        verify_single("/[0-9]/i");
+        let input = "/[0-9]/i";
+        let mut lex = Lexer::new(input.chars());
+        lex.set_goal(LexGoal::InputElementRegExp);
+        let next = lex.next();
+        assert!(lex.next().is_none());
+        assert_eq!(token_text(next), input);
     }
 
     #[test]
@@ -808,6 +821,26 @@ mod tests {
     #[test]
     fn identifies_arrow() {
         verify_single("=>");
+    }
+
+    #[test]
+    fn identifies_lt() {
+        verify_single("<");
+    }
+
+    #[test]
+    fn identifies_lte() {
+        verify_single("<=");
+    }
+
+    #[test]
+    fn identifies_left_shift() {
+        verify_single("<<");
+    }
+
+    #[test]
+    fn identifies_left_shift_equals() {
+        verify_single("<<=");
     }
 
     fn verify_single(input: &str) {
