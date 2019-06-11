@@ -85,8 +85,24 @@ mod tests {
 
     #[test]
     fn gets_first_char() {
-        let stream = LexStream::new("abc");
+        let mut stream = LexStream::new("abc".chars());
         let next = stream.next();
-        assert_eq!('a', next);
+        assert_eq!(Some('a'), next);
+    }
+
+    #[test]
+    fn gets_next_char() {
+        let mut stream = LexStream::new("abc".chars());
+        stream.next();
+        let next = stream.next();
+        assert_eq!(Some('b'), next);
+    }
+
+    #[test]
+    fn skips_char() {
+        let mut stream = LexStream::new("abc".chars());
+        stream.skip_char();
+        let next = stream.next();
+        assert_eq!(Some('b'), next);
     }
 }

@@ -1,6 +1,5 @@
 extern crate unicode;
 
-
 mod charclass;
 mod lexerror;
 mod lexstream;
@@ -328,6 +327,7 @@ where I: Iterator<Item = char>,
     }
 
     fn equal(&mut self) -> TokenType {
+        self.stream.skip_char();
         if self.stream.skip_if('>') {
             TokenType::Arrow
         } else if self.stream.skip_if('=') {
