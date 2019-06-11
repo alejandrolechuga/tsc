@@ -130,6 +130,7 @@ where I: Iterator<Item = char>,
             Some('0') => {
                 s.push('0');
                 self.stream.skip_char();
+
                 match self.stream.peek() {
                     Some(c) if c == 'x' || c == 'X' => {
                         self.stream.skip_char();
@@ -143,13 +144,12 @@ where I: Iterator<Item = char>,
                             },
                             None => return Err(self.unexpected_eof())
                         }
-                        self.stream.push_while(&mut s, |c| c.is_ascii_hexdigit())
+                        self.stream.push_while(&mut s, |c| c.is_ascii_hexdigit());
+                        return Ok(TokenType::Number(s));
                     },
                     Some(_) => (),
                     None => ()
                 }
-
-                return Ok(TokenType::Number(s));
             },
             None => return Err(self.unexpected_eof()),
             Some(_) => ()
@@ -841,6 +841,36 @@ mod tests {
     #[test]
     fn identifies_left_shift_equals() {
         verify_single("<<=");
+    }
+
+    #[test]
+    fn identifies_gt() {
+        verify_single(">");
+    }
+
+    #[test]
+    fn identifies_gte() {
+        verify_single(">=");
+    }
+
+    #[test]
+    fn identifies_right_shift() {
+        verify_single(">>");
+    }
+
+    #[test]
+    fn identifies_right_shift_equals() {
+        verify_single(">>=");
+    }
+
+    #[test]
+    fn identifies_triple_right_shift() {
+        verify_single(">>>");
+    }
+
+    #[test]
+    fn identifies_triple_right_shift_equals() {
+        verify_single(">>>=");
     }
 
     fn verify_single(input: &str) {
