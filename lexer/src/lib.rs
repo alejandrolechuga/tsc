@@ -466,6 +466,7 @@ where I: Iterator<Item = char>,
     }
 
     fn percent(&mut self) -> TokenType {
+        self.stream.skip_char();
         if self.stream.skip_if('=') {
             TokenType::PercentEquals
         } else {
@@ -474,6 +475,7 @@ where I: Iterator<Item = char>,
     }
 
     fn asterisk(&mut self) -> TokenType {
+        self.stream.skip_char();
         if self.stream.skip_if('*') {
             if self.stream.skip_if('=') {
                 TokenType::PowerEquals
@@ -871,6 +873,141 @@ mod tests {
     #[test]
     fn identifies_triple_right_shift_equals() {
         verify_single(">>>=");
+    }
+
+    #[test]
+    fn identifies_identifiers() {
+        verify_single("foo");
+    }
+
+    #[test]
+    fn identifies_left_paren() {
+        verify_single("(");
+    }
+
+    #[test]
+    fn identifies_right_paren() {
+        verify_single(")");
+    }
+
+    #[test]
+    fn identifies_left_bracket() {
+        verify_single("]");
+    }
+
+    #[test]
+    fn identifies_right_bracket() {
+        verify_single("]");
+    }
+
+    #[test]
+    fn identifies_semicolon() {
+        verify_single(";");
+    }
+
+    #[test]
+    fn identifies_colon() {
+        verify_single(":");
+    }
+
+    #[test]
+    fn identifies_comma() {
+        verify_single(",");
+    }
+
+    #[test]
+    fn identifies_binary_and() {
+        verify_single("&");
+    }
+
+    #[test]
+    fn identifies_binary_and_equals() {
+        verify_single("&=");
+    }
+
+    #[test]
+    fn identifies_logical_and() {
+        verify_single("&&");
+    }
+
+    #[test]
+    fn identifies_binary_or() {
+        verify_single("|");
+    }
+
+    #[test]
+    fn identifies_binary_or_equals() {
+        verify_single("|=");
+    }
+
+    #[test]
+    fn identifies_logical_or() {
+        verify_single("||");
+    }
+
+    #[test]
+    fn identifies_bang() {
+        verify_single("!");
+    }
+
+    #[test]
+    fn identifies_not_equals() {
+        verify_single("!=");
+    }
+
+    #[test]
+    fn identifies_not_equals_equals() {
+        verify_single("!==");
+    }
+
+    #[test]
+    fn identifies_binary_xor() {
+        verify_single("^");
+    }
+
+    #[test]
+    fn identifies_binary_xor_equals() {
+        verify_single("^=");
+    }
+
+    #[test]
+    fn identifies_plus() {
+        verify_single("+");
+    }
+
+    #[test]
+    fn identifies_plus_equals() {
+        verify_single("+=");
+    }
+
+    #[test]
+    fn identifies_mod() {
+        verify_single("%");
+    }
+
+    #[test]
+    fn identifies_mod_equals() {
+        verify_single("%=");
+    }
+
+    #[test]
+    fn identifies_times() {
+        verify_single("*");
+    }
+
+    #[test]
+    fn identifies_times_equals() {
+        verify_single("*=");
+    }
+
+    #[test]
+    fn identifies_power() {
+        verify_single("**");
+    }
+
+    #[test]
+    fn identifies_power_equals() {
+        verify_single("**=");
     }
 
     fn verify_single(input: &str) {

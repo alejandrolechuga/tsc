@@ -103,7 +103,7 @@ impl fmt::Display for TokenType {
             TokenType::BinaryOr => write!(f, "|"),
             TokenType::BinaryXorEquals => write!(f, "^="),
             TokenType::BinaryXor => write!(f, "^"),
-            TokenType::Colon => write!(f, ","),
+            TokenType::Colon => write!(f, ":"),
             TokenType::Comma => write!(f, ","),
             TokenType::Comment(s, CommentStyle::MultiLine) => write!(f, "/*{}*/", s),
             TokenType::Comment(s, CommentStyle::SingleLine) => write!(f, "//{}", s),
