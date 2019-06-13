@@ -9,9 +9,9 @@ jobs:
       - run:
           command: cargo fetch
       - save_cache:
-        key: packages-v1-{{ checksum "~/.cargo" }}
-        paths:
-          - "~/.cargo"
+          key: packages-v1-{{ checksum "~/.cargo" }}
+          paths:
+            - "~/.cargo"
       - run:
           command: cargo test
 workflows:
