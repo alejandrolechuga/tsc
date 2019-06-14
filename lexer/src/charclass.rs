@@ -55,3 +55,10 @@ pub fn is_ascii_octaldigit(c: char) -> bool {
         None => false
     }
 }
+
+pub fn is_ascii_binarydigit(c: char) -> bool {
+    match c.to_digit(2) {
+        Some(_) => true,
+        None => false
+    }
+}

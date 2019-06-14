@@ -18,6 +18,7 @@ use self::charclass::{
     is_line_terminator,
     is_ws,
     is_ascii_octaldigit,
+    is_ascii_binarydigit
 };
 
 pub enum LexGoal {
@@ -124,7 +125,7 @@ where I: Iterator<Item = char>,
     fn digit(&mut self) -> Result<TokenType, LexError> {
         let mut s = String::new();
 
-        
+
         match self.stream.peek() {
             Some('0') => {
                 s.push('0');
@@ -132,15 +133,13 @@ where I: Iterator<Item = char>,
                 match self.stream.peek() {
                     // hexadecimal part
                     Some(c) if c == 'x' || c == 'X' => {
-                        s.push(c);
                         self.stream.skip_char();
+                        s.push(c);
                         match self.stream.next() {
                             Some(c) if c.is_ascii_hexdigit() => {
-                                s.push(c);
+                                s.push(c)
                             },
-                            Some(c) => {
-                                return Err(self.unexpected_char(c))
-                            },
+                            Some(c) => return Err(self.unexpected_char(c)),
                             None => return Err(self.unexpected_eof())
                         }
                         self.stream.push_while(&mut s, |c| c.is_ascii_hexdigit());
@@ -148,21 +147,38 @@ where I: Iterator<Item = char>,
                     },
                     // octal part
                     Some(c) if c == 'o' || c == 'O' => {
-                        self.stream.skip_char();                        
+                        self.stream.skip_char();
                         s.push(c);
-                        
+
                         match self.stream.next() {
                             // if is a digit between 0 and 7
                             Some(c) if is_ascii_octaldigit(c) => {
-                                s.push(c);
+                                s.push(c)
                             },
                             // otherwise return an error
-                            Some(c) => return Err(self.unexpected_char(c)), 
+                            Some(c) => return Err(self.unexpected_char(c)),
                             None => return Err(self.unexpected_eof())
                         }
                         self.stream.push_while(&mut s, |c| is_ascii_octaldigit(c));
                         return Ok(TokenType::Number(s))
                     },
+                    // binary part
+                    Some(c) if c == 'b' || c == 'B' => {
+                        self.stream.skip_char();
+                        s.push(c);
+
+                        match self.stream.next() {
+                            // if is a digit between 0 and 7
+                            Some(c) if is_ascii_binarydigit(c) => {
+                                s.push(c)
+                            },
+                            // otherwise return an error
+                            Some(c) => return Err(self.unexpected_char(c)),
+                            None => return Err(self.unexpected_eof())
+                        }
+                        self.stream.push_while(&mut s, |c| is_ascii_binarydigit(c));
+                        return Ok(TokenType::Number(s))
+                    }
                     Some(_) => (),
                     None => ()
                 }
@@ -804,6 +820,11 @@ mod tests {
     #[test]
     fn identifies_octal() {
         verify_single("0o7");
+    }
+
+    #[test]
+    fn identifies_binary() {
+        verify_single("0b0101");
     }
 
     #[test]
