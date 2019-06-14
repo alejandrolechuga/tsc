@@ -17,6 +17,7 @@ use self::charclass::{
     is_id_continue,
     is_line_terminator,
     is_ws,
+    is_ascii_octaldigit,
 };
 
 pub enum LexGoal {
@@ -123,18 +124,16 @@ where I: Iterator<Item = char>,
     fn digit(&mut self) -> Result<TokenType, LexError> {
         let mut s = String::new();
 
-        // is digit 0
-        // is the next thing x
-        // next thing should hex digits
+        
         match self.stream.peek() {
             Some('0') => {
                 s.push('0');
                 self.stream.skip_char();
-
                 match self.stream.peek() {
+                    // hexadecimal part
                     Some(c) if c == 'x' || c == 'X' => {
-                        self.stream.skip_char();
                         s.push(c);
+                        self.stream.skip_char();
                         match self.stream.next() {
                             Some(c) if c.is_ascii_hexdigit() => {
                                 s.push(c);
@@ -145,7 +144,24 @@ where I: Iterator<Item = char>,
                             None => return Err(self.unexpected_eof())
                         }
                         self.stream.push_while(&mut s, |c| c.is_ascii_hexdigit());
-                        return Ok(TokenType::Number(s));
+                        return Ok(TokenType::Number(s))
+                    },
+                    // octal part
+                    Some(c) if c == 'o' || c == 'O' => {
+                        self.stream.skip_char();                        
+                        s.push(c);
+                        
+                        match self.stream.next() {
+                            // if is a digit between 0 and 7
+                            Some(c) if is_ascii_octaldigit(c) => {
+                                s.push(c);
+                            },
+                            // otherwise return an error
+                            Some(c) => return Err(self.unexpected_char(c)), 
+                            None => return Err(self.unexpected_eof())
+                        }
+                        self.stream.push_while(&mut s, |c| is_ascii_octaldigit(c));
+                        return Ok(TokenType::Number(s))
                     },
                     Some(_) => (),
                     None => ()
@@ -778,6 +794,16 @@ mod tests {
     #[test]
     fn identifies_decimal() {
         verify_single(".123");
+    }
+
+    #[test]
+    fn identifies_hexadecimal() {
+        verify_single("0xA");
+    }
+
+    #[test]
+    fn identifies_octal() {
+        verify_single("0o7");
     }
 
     #[test]
